@@ -379,6 +379,10 @@ public class NativeJavaObject implements Scriptable, SymbolScriptable, Wrapper, 
                     return 2;
                 } else if (to.isPrimitive() && to != Boolean.TYPE) {
                     return (fromCode == JSTYPE_JAVA_ARRAY) ? CONVERSION_NONE : 2 + getSizeRank(to);
+                } else if (to.isArray() && javaObj.getClass().isArray()) {
+    				return CONVERSION_TRIVIAL;
+    			} else if (to.isInstance(fromObj)) {
+    				return CONVERSION_TRIVIAL;
                 }
                 break;
 
@@ -611,6 +615,20 @@ public class NativeJavaObject implements Scriptable, SymbolScriptable, Wrapper, 
                 }
                 if (type.isInstance(value)) {
                     return value;
+                }
+                if (type.isArray() && value.getClass().isArray()) {
+              	  long length = Array.getLength(value);
+              	  Class arrayType = type.getComponentType();
+              	  Object result = Array.newInstance(arrayType, (int) length);
+              	  for (int i = 0; i < length; ++i) {
+              		  try {
+              			  Array.set(result, i,
+              					coerceTypeImpl(arrayType, Array.get(value, i)));
+              		  } catch (EvaluatorException ee) {
+              			  reportConversionError(value, type);
+              		  }
+              	  }
+              	  return result;
                 }
                 reportConversionError(value, type);
                 break;
