@@ -31,14 +31,14 @@ import javax.lang.model.SourceVersion;
  * @see NativeJavaObject
  * @see NativeJavaClass
  */
-class JavaMembers {
+public class JavaMembers {
 
     private static final boolean STRICT_REFLECTIVE_ACCESS =
             SourceVersion.latestSupported().ordinal() > 8;
 
     private static final Permission allPermission = new AllPermission();
 
-    JavaMembers(Scriptable scope, Class<?> cl) {
+    public JavaMembers(Scriptable scope, Class<?> cl) {
         this(scope, cl, false);
     }
 
@@ -58,6 +58,52 @@ class JavaMembers {
             Context.exit();
         }
     }
+
+    public List<String> getFieldIds(boolean isStatic) {
+		Map<String, Object> ht = isStatic ? staticMembers : members;
+		ArrayList<String> list = new ArrayList<String>();
+		Iterator<String> keys = ht.keySet().iterator();
+		while (keys.hasNext()) {
+			String key = keys.next();
+			if (!(ht.get(key) instanceof NativeJavaMethod)) {
+				list.add(key);
+			}
+		}
+		return list;
+
+	}
+
+	public List<String> getMethodIds(boolean isStatic) {
+		Map<String, Object> ht = isStatic ? staticMembers : members;
+		ArrayList<String> list = new ArrayList<String>();
+		Iterator<String> keys = ht.keySet().iterator();
+		while (keys.hasNext()) {
+			String key = keys.next();
+			if ((ht.get(key) instanceof NativeJavaMethod)) {
+				list.add(key);
+			}
+		}
+		return list;
+	}
+
+	public NativeJavaMethod getMethod(String id, boolean isStatic) {
+		Map<String, Object> ht = isStatic ? staticMembers : members;
+		Object o = ht.get(id);
+		if (o instanceof NativeJavaMethod) {
+			return (NativeJavaMethod) o;
+		}
+		return null;
+	}
+
+	public Object getField(String id, boolean isStatic) {
+		Map<String, Object> ht = isStatic ? staticMembers : members;
+		return ht.get(id);
+		// if(o instanceof JavaMembers.BeanProperty)
+		// {
+		// return (JavaMembers.BeanProperty)o;
+		// }
+		// return null;
+	}
 
     boolean has(String name, boolean isStatic) {
         Map<String, Object> ht = isStatic ? staticMembers : members;
@@ -171,7 +217,7 @@ class JavaMembers {
         }
     }
 
-    Object[] getIds(boolean isStatic) {
+    public Object[] getIds(boolean isStatic) {
         Map<String, Object> map = isStatic ? staticMembers : members;
         return map.keySet().toArray(new Object[map.size()]);
     }
@@ -314,7 +360,7 @@ class JavaMembers {
      * and interfaces (if they exist). Basically upcasts every method to the nearest accessible
      * method.
      */
-    private Method[] discoverAccessibleMethods(
+    protected Method[] discoverAccessibleMethods(
             Class<?> clazz, boolean includeProtected, boolean includePrivate) {
         Map<MethodSignature, Method> map = new HashMap<MethodSignature, Method>();
         discoverAccessibleMethods(clazz, map, includeProtected, includePrivate);
@@ -869,24 +915,33 @@ class JavaMembers {
                 "msg.java.member.not.found", cl.getName(), memberName);
     }
 
-    private Class<?> cl;
-    private Map<String, Object> members;
+    protected Class<?> cl;
+    protected Map<String, Object> members;
     private Map<String, FieldAndMethods> fieldAndMethods;
-    private Map<String, Object> staticMembers;
+    protected Map<String, Object> staticMembers;
     private Map<String, FieldAndMethods> staticFieldAndMethods;
     NativeJavaMethod ctors; // we use NativeJavaMethod for ctor overload resolution
-}
 
-class BeanProperty {
-    BeanProperty(MemberBox getter, MemberBox setter, NativeJavaMethod setters) {
-        this.getter = getter;
-        this.setter = setter;
-        this.setters = setters;
+    public class BeanProperty {
+        public BeanProperty(MemberBox getter, MemberBox setter, NativeJavaMethod setters) {
+            this.getter = getter;
+            this.setter = setter;
+            this.setters = setters;
+        }
+
+    	public Method getSetter() {
+    		return setter.method();
+    	}
+
+    	public Method getGetter() {
+    		return getter.method();
+    	}
+    	
+        MemberBox getter;
+        MemberBox setter;
+        NativeJavaMethod setters;
     }
 
-    MemberBox getter;
-    MemberBox setter;
-    NativeJavaMethod setters;
 }
 
 class FieldAndMethods extends NativeJavaMethod {
