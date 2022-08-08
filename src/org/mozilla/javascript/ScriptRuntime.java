@@ -986,7 +986,7 @@ public class ScriptRuntime {
     public static String toString(Object val) {
         for (; ; ) {
             if (val == null) {
-                return "null";
+                return "";
             }
             if (Undefined.isUndefined(val)) {
                 return "undefined";
