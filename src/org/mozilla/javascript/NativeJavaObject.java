@@ -555,6 +555,10 @@ public class NativeJavaObject implements Scriptable, SymbolScriptable, Wrapper, 
                 } else if ((type.isPrimitive() && type != Boolean.TYPE)
                         || ScriptRuntime.NumberClass.isAssignableFrom(type)) {
                     return coerceToNumber(type, value);
+                } else if (type == ScriptRuntime.BooleanClass
+    					|| type == Boolean.TYPE) {
+    				return ScriptRuntime.toBoolean(value) ? Boolean.TRUE
+    						: Boolean.FALSE;
                 } else {
                     reportConversionError(value, type);
                 }
