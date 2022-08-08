@@ -174,17 +174,22 @@ public class JavaMembers {
             }
             // If there's only one setter or if the value is null, use the
             // main setter. Otherwise, let the NativeJavaMethod decide which
-            // setter to use:
+            // setter to use but use the getters return type (there could be
+			// multiply settings)
+            Class setType = null;
+			if (bp.setters == null && bp.setter.argTypes.length == 1) {
+				setType = bp.setter.argTypes[0];
+			} else {
+				setType = bp.getter.returnType;
+			}
+			Object[] args = {Context.jsToJava(value, setType)};
             if (bp.setters == null || value == null) {
-                Class<?> setType = bp.setter.argTypes[0];
-                Object[] args = {Context.jsToJava(value, setType)};
                 try {
                     bp.setter.invoke(javaObject, args);
                 } catch (Exception ex) {
                     throw Context.throwAsScriptRuntimeEx(ex);
                 }
             } else {
-                Object[] args = {value};
                 bp.setters.call(
                         Context.getContext(),
                         ScriptableObject.getTopLevelScope(scope),
