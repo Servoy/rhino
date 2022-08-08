@@ -9,6 +9,7 @@ package org.mozilla.javascript;
 import java.lang.reflect.Array;
 import java.lang.reflect.Method;
 import java.util.Arrays;
+import java.util.HashSet;
 import java.util.concurrent.CopyOnWriteArrayList;
 
 /**
@@ -329,6 +330,27 @@ public class NativeJavaMethod extends BaseFunction {
         return findFunction(cx, methods, args);
     }
 
+	/*
+	 * @param args
+	 */
+	private static void unwrapArray(Object[] args) {
+		unwrapArrayImpl(args, new HashSet<Object>());
+	}
+	
+	private static void unwrapArrayImpl(Object[] args, HashSet<Object> processed) {
+		for (int j = 0; j < args.length; j++) {
+			if (args[j] instanceof Wrapper) {
+				if (processed.contains(args[j])) continue;
+				processed.add(args[j]);
+				args[j] = ((Wrapper) args[j]).unwrap();
+				if (args[j] instanceof Object[]
+						&& !args[j].getClass().getComponentType().isPrimitive()) {
+					unwrapArrayImpl((Object[]) args[j], processed);
+				}
+			}
+		}
+	}
+
     /**
      * Find the index of the correct function to call given the set of methods or constructors and
      * the arguments. If no function can be found to call, return -1.
@@ -528,21 +550,36 @@ public class NativeJavaMethod extends BaseFunction {
      */
     private static int preferSignature(
             Object[] args, Class<?>[] sig1, boolean vararg1, Class<?>[] sig2, boolean vararg2) {
-        int totalPreference = 0;
+        int totalPreference = PREFERENCE_EQUAL;
         for (int j = 0; j < args.length; j++) {
+        	Object arg = args[j];
             Class<?> type1 = vararg1 && j >= sig1.length ? sig1[sig1.length - 1] : sig1[j];
             Class<?> type2 = vararg2 && j >= sig2.length ? sig2[sig2.length - 1] : sig2[j];
+			if (vararg1 && vararg2 && j == (sig2.length - 1) && type2.isArray()) type2 = type2.getComponentType();
             if (type1 == type2) {
                 continue;
             }
-            Object arg = args[j];
-
+        	// Test if it is an exact fit.. this also test primitive types so
+        	// that double isnt choose above int if arg == Integer
+        	else if (exactFit(type1, arg)) {
+        		totalPreference |= PREFERENCE_FIRST_ARG;
+        		continue;
+        	} else if (exactFit(type2, arg)) {
+        		totalPreference |= PREFERENCE_SECOND_ARG;
+        		continue;
+        	}
+        	// if they are not equal anymore test if we are now going to test pure varargs
+        	// skip those and return the best match until the var args
+        	if (totalPreference != PREFERENCE_EQUAL) {
+        		if (sig1.length-1==j && vararg1) continue;
+        		if (sig2.length-1==j && vararg2) continue;
+        	}            
             // Determine which of type1, type2 is easier to convert from arg.
 
             int rank1 = NativeJavaObject.getConversionWeight(arg, type1);
             int rank2 = NativeJavaObject.getConversionWeight(arg, type2);
 
-            int preference;
+            int preference = PREFERENCE_EQUAL;
             if (rank1 < rank2) {
                 preference = PREFERENCE_FIRST_ARG;
             } else if (rank1 > rank2) {
@@ -555,21 +592,61 @@ public class NativeJavaMethod extends BaseFunction {
                     } else if (type2.isAssignableFrom(type1)) {
                         preference = PREFERENCE_FIRST_ARG;
                     } else {
-                        preference = PREFERENCE_AMBIGUOUS;
+//                        preference = PREFERENCE_AMBIGUOUS;
                     }
                 } else {
-                    preference = PREFERENCE_AMBIGUOUS;
+//                    preference = PREFERENCE_AMBIGUOUS;
                 }
             }
 
             totalPreference |= preference;
 
-            if (totalPreference == PREFERENCE_AMBIGUOUS) {
-                break;
-            }
+//            if (totalPreference == PREFERENCE_AMBIGUOUS) {
+//                break;
+//            }
         }
         return totalPreference;
     }
+
+	/**
+	 * @param type1
+	 * @param arg
+	 * @return
+	 */
+	private static boolean exactFit(Class type, Object arg) {
+		if (arg != null) {
+			if (type.getClass() == arg.getClass()) {
+				return true;
+			}
+			if (type.isPrimitive()) {
+				if (type == int.class) {
+					return arg.getClass() == Integer.class;
+				}
+				if (type == long.class) {
+					return arg.getClass() == Long.class;
+				}
+				if (type == float.class) {
+					return arg.getClass() == Float.class;
+				}
+				if (type == double.class) {
+					return arg.getClass() == Double.class;
+				}
+				if (type == boolean.class) {
+					return arg.getClass() == Boolean.class;
+				}
+				if (type == short.class) {
+					return arg.getClass() == Short.class;
+				}
+				if (type == char.class) {
+					return arg.getClass() == Character.class;
+				}
+				if (type == byte.class) {
+					return arg.getClass() == Byte.class;
+				}
+			}
+		}
+		return false;
+	}
 
     private static final boolean debug = false;
 
