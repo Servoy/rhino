@@ -1195,6 +1195,14 @@ public final class Interpreter extends Icode implements Evaluator {
                 // Store new frame in cx which is used for error reporting etc.
                 cx.lastInterpreterFrame = frame;
 
+                CallFrame loop = frame;
+				for(int stackDept=0;loop.parentFrame != null;stackDept++) {
+					if (stackDept == 1000) {
+						throw ScriptRuntime.constructError("ReferenceError", "Stack overflow encountered");
+					}
+					loop = loop.parentFrame;
+				}
+				
                 Loop:
                 for (; ; ) {
 
