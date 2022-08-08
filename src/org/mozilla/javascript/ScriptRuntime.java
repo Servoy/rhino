@@ -7,6 +7,7 @@
 package org.mozilla.javascript;
 
 import java.io.Serializable;
+import java.lang.reflect.Array;
 import java.lang.reflect.Constructor;
 import java.math.BigDecimal;
 import java.math.BigInteger;
@@ -397,7 +398,8 @@ public class ScriptRuntime {
                 double d = ((Number) val).doubleValue();
                 return (!Double.isNaN(d) && d != 0.0);
             }
-            if (val instanceof Date) return true;
+        	if (val instanceof Date) return true;
+        	if (val.getClass().isArray()) return Array.getLength(val) != 0;
             if (val instanceof Scriptable) {
                 if (val instanceof ScriptableObject
                         && ((ScriptableObject) val).avoidObjectDetection()) {
