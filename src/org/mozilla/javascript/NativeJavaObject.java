@@ -286,10 +286,10 @@ public class NativeJavaObject implements Scriptable, SymbolScriptable, Wrapper, 
 
         switch (fromCode) {
             case JSTYPE_UNDEFINED:
-                if (to == ScriptRuntime.StringClass || to == ScriptRuntime.ObjectClass) {
-                    return 1;
-                }
-                break;
+//                if (to == ScriptRuntime.StringClass || to == ScriptRuntime.ObjectClass) {
+//                    return 1;
+//                }
+//                break;
 
             case JSTYPE_NULL:
                 if (!to.isPrimitive()) {
@@ -497,11 +497,18 @@ public class NativeJavaObject implements Scriptable, SymbolScriptable, Wrapper, 
                 return null;
 
             case JSTYPE_UNDEFINED:
-                if (type == ScriptRuntime.StringClass || type == ScriptRuntime.ObjectClass) {
-                    return "undefined";
-                }
-                reportConversionError("undefined", type);
-                break;
+//              if (type == ScriptRuntime.StringClass ||
+//              type == ScriptRuntime.ObjectClass) {
+//              return "undefined";
+//          }
+//          else {
+//              reportConversionError("undefined", type);
+//          }
+//      	  break;
+		      	if (type.isPrimitive()) {
+						reportConversionError(value, type);
+				}
+				return null;
 
             case JSTYPE_BOOLEAN:
                 // Under LC3, only JS Booleans can be coerced into a Boolean value
