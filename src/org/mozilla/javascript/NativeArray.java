@@ -1059,12 +1059,13 @@ public class NativeArray extends IdScriptableObject implements List,Wrapper {
         // whether to return '4,unquoted,5' or '[4, "quoted", 5]'
         String separator;
 
-        if (toSource) {
+        // We want always this to be default to this, just as native java array
+//        if (toSource) {
             result.append('[');
             separator = ", ";
-        } else {
-            separator = ",";
-        }
+//        } else {
+//            separator = ",";
+//        }
 
         boolean haslast = false;
         long i = 0;
@@ -1119,7 +1120,17 @@ public class NativeArray extends IdScriptableObject implements List,Wrapper {
                         result.append(ScriptRuntime.toString(elem));
                     }
                 }
-
+                Object[] ids = thisObj.getIds();
+				for (int j = 0; j < ids.length; j++) {
+					if (ids[j] instanceof String) {
+						if (j > 0)
+							result.append(separator);
+						result.append(ids[j]);
+						result.append("=");
+						result.append(ScriptRuntime.toString(thisObj.get(
+								(String) ids[j], thisObj)));
+					}
+				}
                 // processing of thisObj done, remove it from the recursion detector
                 // to allow thisObj to be again in the array later on
                 cx.iterating.remove(o);
@@ -1130,11 +1141,12 @@ public class NativeArray extends IdScriptableObject implements List,Wrapper {
             }
         }
 
-        if (toSource) {
+    	// We want always this to be default to this, just as native java array
+		// if (toSource) {
             // for [,,].length behavior; we want toString to be symmetric.
             if (!haslast && i > 0) result.append(", ]");
             else result.append(']');
-        }
+//        }
         return result.toString();
     }
 
@@ -2137,7 +2149,7 @@ public class NativeArray extends IdScriptableObject implements List,Wrapper {
         if (!(o instanceof Scriptable)) {
             return false;
         }
-        return "Array".equals(((Scriptable) o).getClassName());
+        return "Array".equals(((Scriptable) o).getClassName()) || "JavaArray".equals(((Scriptable)o).getClassName());
     }
 
     // methods to implement java.util.List
