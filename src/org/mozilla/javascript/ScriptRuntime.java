@@ -2928,7 +2928,9 @@ public class ScriptRuntime {
     // as "~toInt32(val)"
 
     public static Object add(Object val1, Object val2, Context cx) {
-        if (val1 instanceof BigInteger && val2 instanceof BigInteger) {
+    	if (val1 == null && val2 == null)
+			return null;
+    	if (val1 instanceof BigInteger && val2 instanceof BigInteger) {
             return ((BigInteger) val1).add((BigInteger) val2);
         }
         if ((val1 instanceof Number && val2 instanceof BigInteger)
