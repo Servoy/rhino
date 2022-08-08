@@ -25,7 +25,7 @@ import java.util.ArrayDeque;
  *
  * <p>Both the name and the concept are borrowed from V8.</p>
  */
-public class ConsString implements CharSequence, Serializable {
+public class ConsString implements CharSequence, Serializable, Wrapper {
 
     private static final long serialVersionUID = -8432806714471372570L;
 
@@ -99,5 +99,10 @@ public class ConsString implements CharSequence, Serializable {
     public CharSequence subSequence(int start, int end) {
         String str = isFlat ? (String)left : flatten();
         return str.substring(start, end);
+    }
+    
+    @Override
+    public Object unwrap() {
+    	return toString();
     }
 }

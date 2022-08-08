@@ -28,7 +28,7 @@ import org.mozilla.javascript.xml.XMLObject;
  * @author Norris Boyd
  * @author Mike McCabe
  */
-public class NativeArray extends IdScriptableObject implements List {
+public class NativeArray extends IdScriptableObject implements List,Wrapper {
     private static final long serialVersionUID = 7331366857676127338L;
 
     /*
@@ -81,6 +81,32 @@ public class NativeArray extends IdScriptableObject implements List {
         return "Array";
     }
 
+    /**
+	 * @see org.mozilla.javascript.Wrapper#unwrap()
+	 */
+	public Object unwrap() {
+		Object[] ids = getIds();
+
+		for (int i = 0; i < ids.length; i++) {
+			if (ids[i] instanceof String || (ids[i] instanceof Number && ((Number) ids[i]).intValue() < 0)) {
+				return this;
+			}
+		}
+
+		ArrayList<Object> al = new ArrayList<Object>(ids.length);
+		for (int i = 0; i < ids.length; i++) {
+			if (ids[i] instanceof Number) {
+				int index = ((Number) ids[i]).intValue();
+				Object o = get(index, this);
+				if (o != NOT_FOUND) {
+					while (al.size() <= index)
+						al.add(null);
+					al.set(index, o);
+				}
+			}
+		}
+		return al.toArray();
+	}
     private static final int Id_length = 1, MAX_INSTANCE_ID = 1;
 
     @Override

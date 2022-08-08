@@ -27,7 +27,7 @@ import org.mozilla.javascript.regexp.NativeRegExp;
  * @author Norris Boyd
  * @author Ronald Brill
  */
-final class NativeString extends IdScriptableObject {
+final class NativeString extends IdScriptableObject implements Wrapper {
     private static final long serialVersionUID = 920268368584188687L;
 
     private static final Object STRING_TAG = "String";
@@ -45,6 +45,13 @@ final class NativeString extends IdScriptableObject {
     public String getClassName() {
         return "String";
     }
+
+    /**
+	 * @see org.mozilla.javascript.Wrapper#unwrap()
+	 */
+	public Object unwrap() {
+		return string;
+	}
 
     private static final int Id_length = 1, MAX_INSTANCE_ID = 1;
 
