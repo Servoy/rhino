@@ -64,6 +64,15 @@ public class NativeJavaObject implements Scriptable, SymbolScriptable, Wrapper, 
 				javaObject, false);
 	}
 
+    public boolean isDeprecated(String name)
+    {
+    	if (has(name,null))
+    	{
+    		return members.isDeprecated(name, false);
+    	}
+    	return false;
+    }
+
     protected void initMembers() {
         Class<?> dynamicType;
         if (javaObject != null) {
