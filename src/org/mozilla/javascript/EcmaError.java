@@ -32,7 +32,7 @@ public class EcmaError extends RhinoException
      * @param lineSource the source of the line containing the error (may be
      *                   null if unknown)
      */
-    EcmaError(String errorName, String errorMessage,
+    public EcmaError(String errorName, String errorMessage,
               String sourceName, int lineNumber,
               String lineSource, int columnNumber)
     {

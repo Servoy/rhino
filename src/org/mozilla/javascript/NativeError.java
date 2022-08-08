@@ -13,7 +13,7 @@ import java.io.Serializable;
  *
  * <p>ECMA 15.11
  */
-final class NativeError extends IdScriptableObject {
+public final class NativeError extends IdScriptableObject {
     private static final long serialVersionUID = -5338413581437645187L;
 
     private static final Object ERROR_TAG = "Error";

@@ -32,7 +32,7 @@ public class ClassCache implements Serializable {
      * CacheKey is a combination of class and securityContext. This is required when classes are
      * loaded from different security contexts
      */
-    static class CacheKey {
+    public static class CacheKey {
         final Class<?> cls;
         final Object sec;
         /** Constructor. */
@@ -132,7 +132,7 @@ public class ClassCache implements Serializable {
     }
 
     /** @return a map from classes to associated JavaMembers objects */
-    Map<CacheKey, JavaMembers> getClassCacheMap() {
+    public Map<CacheKey, JavaMembers> getClassCacheMap() {
         if (classTable == null) {
             // Use 1 as concurrency level here and for other concurrent hash maps
             // as we don't expect high levels of sustained concurrent writes.
