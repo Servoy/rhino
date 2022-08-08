@@ -366,6 +366,13 @@ public class NativeJavaObject implements Scriptable, SymbolScriptable, Wrapper, 
                 if (to.isInstance(javaObj)) {
                     return CONVERSION_NONTRIVIAL;
                 }
+                // unwrap this again as may be wrapped twice
+                if (javaObj instanceof Wrapper) {
+                	javaObj = ((Wrapper) javaObj).unwrap();
+                }
+                if (to.isInstance(javaObj)) {
+                	return CONVERSION_NONTRIVIAL;
+                }
                 if (to == ScriptRuntime.StringClass) {
                     return 2;
                 } else if (to.isPrimitive() && to != Boolean.TYPE) {
