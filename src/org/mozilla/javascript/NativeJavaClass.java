@@ -205,10 +205,15 @@ public class NativeJavaClass extends NativeJavaObject implements Function
                                         Object[] args, MemberBox ctor)
     {
         Object instance = constructInternal(args, ctor);
-        // we need to force this to be wrapped, because construct _has_
-        // to return a scriptable
-        Scriptable topLevel = ScriptableObject.getTopLevelScope(scope);
-        return cx.getWrapFactory().wrapNewObject(cx, topLevel, instance);
+        if (instance instanceof String) {
+	        // we need to force this to be wrapped, because construct _has_
+	        // to return a scriptable
+	        Scriptable topLevel = ScriptableObject.getTopLevelScope(scope);
+	        return cx.getWrapFactory().wrapNewObject(cx, topLevel, instance);
+        } else {
+        	return ScriptRuntime.toObject(scope, instance);
+        }
+
     }
 
     static Object constructInternal(Object[] args, MemberBox ctor)
