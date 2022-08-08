@@ -4731,7 +4731,7 @@ public class ScriptRuntime {
                             "msg.non.js.object.warning",
                             nonJSObject,
                             nonJSObject.getClass().getName());
-            Context.reportWarning(message);
+            Context.reportWarning(message, new RuntimeException(message));
             // Just to be sure that it would be noticed
             System.err.println(message);
         }
