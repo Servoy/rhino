@@ -11,6 +11,9 @@ import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.io.Serializable;
 
+import org.mozilla.javascript.debug.Debugger;
+import org.mozilla.javascript.debug.IDebuggerWithWatchPoints;
+
 /**
  * Base class for native object implementation that uses IdFunctionObject to export its methods to
  * script via &lt;class-name&gt;.prototype object.
@@ -362,7 +365,15 @@ public abstract class IdScriptableObject extends ScriptableObject implements IdF
 
     @Override
     public Object get(String name, Scriptable start) {
-        // Check for slot first for performance. This is a very hot code
+    	Context currentContext = Context.getCurrentContext();
+		if (currentContext != null) {
+			Debugger debugger = currentContext.getDebugger();
+			if (debugger instanceof IDebuggerWithWatchPoints) {
+				IDebuggerWithWatchPoints wp = (IDebuggerWithWatchPoints) debugger;
+				wp.access(name, this);
+			}
+		}
+		// Check for slot first for performance. This is a very hot code
         // path that should be further optimized.
         Object value = super.get(name, start);
         if (value != NOT_FOUND) {
@@ -408,6 +419,16 @@ public abstract class IdScriptableObject extends ScriptableObject implements IdF
 
     @Override
     public void put(String name, Scriptable start, Object value) {
+    	Context currentContext = Context.getCurrentContext();
+		if (currentContext != null) {
+			Debugger debugger = currentContext.getDebugger();
+			if (debugger != null) {
+				if (debugger instanceof IDebuggerWithWatchPoints) {
+					IDebuggerWithWatchPoints wp = (IDebuggerWithWatchPoints) debugger;
+					wp.modification(name, this);
+				}
+			}
+		}
         int info = findInstanceIdInfo(name);
         if (info != 0) {
             if (start == this && isSealed()) {
