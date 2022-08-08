@@ -3435,7 +3435,7 @@ public class ScriptRuntime {
                     // the LiveConnect case.
                     Object unwrappedX = ((Wrapper) x).unwrap();
                     Object unwrappedY = ((Wrapper) y).unwrap();
-                    return unwrappedX == unwrappedY
+                    return unwrappedX == unwrappedY || (unwrappedX != null && unwrappedX.equals(unwrappedY))
                             || (isPrimitive(unwrappedX)
                                     && isPrimitive(unwrappedY)
                                     && eq(unwrappedX, unwrappedY));
