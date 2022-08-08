@@ -502,12 +502,13 @@ public class NativeJavaMethod extends BaseFunction {
         if (firstBestFit < 0) {
             // Nothing was found
             return -1;
-        } else if (extraBestFitsCount == 0) {
+        } else /*if (extraBestFitsCount == 0) */ {
             // single best fit
             return firstBestFit;
         }
 
         // report remaining ambiguity
+        /*
         StringBuilder buf = new StringBuilder();
         for (int j = -1; j != extraBestFitsCount; ++j) {
             int bestFitIndex;
@@ -534,6 +535,7 @@ public class NativeJavaMethod extends BaseFunction {
                 memberName,
                 scriptSignature(args),
                 buf.toString());
+         */
     }
 
     /** Types are equal */
