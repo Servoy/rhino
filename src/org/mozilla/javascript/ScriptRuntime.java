@@ -13,6 +13,7 @@ import java.math.BigInteger;
 import java.math.MathContext;
 import java.text.MessageFormat;
 import java.util.Arrays;
+import java.util.Date;
 import java.util.Locale;
 import java.util.ResourceBundle;
 import java.util.function.BiConsumer;
@@ -396,6 +397,7 @@ public class ScriptRuntime {
                 double d = ((Number) val).doubleValue();
                 return (!Double.isNaN(d) && d != 0.0);
             }
+            if (val instanceof Date) return true;
             if (val instanceof Scriptable) {
                 if (val instanceof ScriptableObject
                         && ((ScriptableObject) val).avoidObjectDetection()) {
@@ -1086,6 +1088,9 @@ public class ScriptRuntime {
             }
             return toString(d);
         }
+        if (value instanceof Date) {
+			return value.toString();
+		}
         if (value instanceof Boolean) {
             return toString(value);
         }
@@ -1238,6 +1243,11 @@ public class ScriptRuntime {
             setBuiltinProtoAndParent(result, scope, TopLevel.Builtins.String);
             return result;
         }
+		if (val instanceof Date) {
+			Object[] args = { val };
+			scope = ScriptableObject.getTopLevelScope(scope);
+			return newObject(cx, scope, "Date", args);
+		}
         if (cx.getLanguageVersion() >= Context.VERSION_ES6 && val instanceof BigInteger) {
             NativeBigInt result = new NativeBigInt(((BigInteger) val));
             setBuiltinProtoAndParent(result, scope, TopLevel.Builtins.BigInt);
@@ -2677,6 +2687,16 @@ public class ScriptRuntime {
             throw notFunctionError(fun);
         }
         Function function = (Function) fun;
+    	// HACK! Test if this alles makes a new Date with a java.util.Date
+		// constructor
+		// Then replace the date argument with the Long time object.
+		if (function instanceof BaseFunction) {
+			if ("Date".equals(((BaseFunction) function).getFunctionName())
+					&& args != null && args.length == 1
+					&& args[0] instanceof Date) {
+				args[0] = new Long(((Date) args[0]).getTime());
+			}
+		}
         return function.construct(cx, scope, args);
     }
 
@@ -2863,6 +2883,8 @@ public class ScriptRuntime {
         if (value instanceof BigInteger) return "bigint";
         if (value instanceof Number) return "number";
         if (value instanceof Boolean) return "boolean";
+        // special support for date
+        if (value instanceof Date) return "object";
         throw errorWithClassName("msg.invalid.type", value);
     }
 
@@ -3334,6 +3356,22 @@ public class ScriptRuntime {
      * <p>See ECMA 11.9
      */
     public static boolean eq(Object x, Object y) {
+    	// SPECIAL DATE HANDLING
+    	if (x instanceof Date) {
+    		if (y instanceof Wrapper) {
+    			y = ((Wrapper) y).unwrap();
+    		}
+    		if (y instanceof Date) {
+    			return ((Date) x).getTime() == ((Date) y).getTime();
+    		}
+    		return false;
+    	} else if (y instanceof Date && x instanceof Wrapper) {
+    		x = ((Wrapper) x).unwrap();
+    		if (x instanceof Date) {
+    			return ((Date) x).getTime() == ((Date) y).getTime();
+    		}
+    		return false;
+    	}
         if (x == null || Undefined.isUndefined(x)) {
             if (y == null || Undefined.isUndefined(y)) {
                 return true;
@@ -3496,6 +3534,8 @@ public class ScriptRuntime {
                 return x == ((Number) y).doubleValue();
             } else if (y instanceof CharSequence) {
                 return x == toNumber(y);
+            } else if (y instanceof Date) {
+				return x == toNumber(y);
             } else if (y instanceof Boolean) {
                 return x == (((Boolean) y).booleanValue() ? 1.0 : +0.0);
             } else if (isSymbol(y)) {
@@ -3524,6 +3564,8 @@ public class ScriptRuntime {
                 return x.equals(y);
             } else if (y instanceof Number) {
                 return eqBigInt(x, ((Number) y).doubleValue());
+            } else if (y instanceof Date) {
+				return eqBigInt(x, ((Date) y).getTime() );
             } else if (y instanceof CharSequence) {
                 BigInteger biy;
                 try {
@@ -3586,6 +3628,8 @@ public class ScriptRuntime {
                 return toNumber(x.toString()) == ((Number) y).doubleValue();
             } else if (y instanceof Boolean) {
                 return toNumber(x.toString()) == (((Boolean) y).booleanValue() ? 1.0 : 0.0);
+            } else if (y instanceof Date) {
+				return y.toString().equals(x);
             } else if (isSymbol(y)) {
                 return false;
             } else if (y instanceof Scriptable) {
@@ -3613,7 +3657,11 @@ public class ScriptRuntime {
             double d = ((Number) x).doubleValue();
             return !Double.isNaN(d);
         }
-        if (x == null || x == Undefined.instance || x == Undefined.SCRIPTABLE_UNDEFINED) {
+        if (y instanceof Date) {
+        	return y.equals(x);
+        } else if (x instanceof Date) {
+        	return x.equals(y);
+        } else if (x == null || x == Undefined.instance || x == Undefined.SCRIPTABLE_UNDEFINED) {
             if ((x == Undefined.instance && y == Undefined.SCRIPTABLE_UNDEFINED)
                     || (x == Undefined.SCRIPTABLE_UNDEFINED && y == Undefined.instance))
                 return true;
