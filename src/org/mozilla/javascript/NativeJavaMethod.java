@@ -135,9 +135,30 @@ public class NativeJavaMethod extends BaseFunction {
 
         int index = findCachedFunction(cx, args);
         if (index < 0) {
-            Class<?> c = methods[0].method().getDeclaringClass();
-            String sig = c.getName() + '.' + getFunctionName() + '(' + scriptSignature(args) + ')';
-            throw Context.reportRuntimeErrorById("msg.java.no_such_method", sig);
+			for (int i = 0; i < args.length; i++) {
+				if (args[i] instanceof NativeJavaArray
+						&& ((NativeJavaArray) args[i]).array instanceof Object[]) {
+					args[i] = new NativeArray(
+							(Object[]) ((NativeJavaArray) args[i]).array);
+				}
+			}
+			index = findFunction(cx, methods, args);
+		}
+
+		if (index < 0) {
+			for (int i = 0; i < methods.length; i++) {
+				Class[] types = methods[i].method().getParameterTypes();
+
+				if (types.length == 1 && types[0] == Object[].class) {
+					index = i;
+					break;
+				}
+			}
+			if (index < 0) {
+				Class<?> c = methods[0].method().getDeclaringClass();
+	            String sig = c.getName() + '.' + getFunctionName() + '(' + scriptSignature(args) + ')';
+	            throw Context.reportRuntimeErrorById("msg.java.no_such_method", sig);
+			}
         }
 
         MemberBox meth = methods[index];
@@ -175,6 +196,15 @@ public class NativeJavaMethod extends BaseFunction {
             // replace the original args with the new one
             args = newArgs;
         } else {
+        	if (argTypes.length == 1 && argTypes[0] == Object[].class) {
+        		unwrapArray(args);
+        		if (!(args.length == 1 && args[0] != null && args[0].getClass()
+        				.isArray())) {
+        			Object[] array = new Object[1];
+        			array[0] = args;
+        			args = array;
+        		}
+        	} else {
             // First, we marshall the args.
             Object[] origArgs = args;
             for (int i = 0; i < args.length; i++) {
@@ -184,10 +214,41 @@ public class NativeJavaMethod extends BaseFunction {
                     if (origArgs == args) {
                         args = args.clone();
                     }
+	    				if (coerced instanceof Object[]
+								&& !coerced.getClass().getComponentType()
+										.isPrimitive()) {
+							if (Wrapper.class.isAssignableFrom(coerced
+									.getClass().getComponentType())) {
+								Object[] array = new Object[((Object[]) coerced).length];
+								System.arraycopy(coerced, 0, array, 0,
+										array.length);
+								coerced = array;
+							}
+							unwrapArray((Object[]) coerced);
+						}
                     args[i] = coerced;
                 }
             }
         }
+        }
+        for (int i = 0; i < args.length; i++) {
+			if (args[i] instanceof Object[]) {
+				Object[] arg = (Object[]) args[i];
+				for (int j = 0; j < arg.length; j++) {
+					if (arg[j] instanceof Wrapper) {
+						if (!Wrapper.class.isAssignableFrom(arg.getClass().getComponentType())) 
+						{
+						    arg[j] = ((Wrapper) arg[j]).unwrap();
+						}
+					}
+				}
+			} else if (args[i] instanceof Wrapper) {
+				// in case of varargs (i >= argTypes.length) or method is declared with non-wrapper: call method with unwrapped
+				if (i >= argTypes.length || !Wrapper.class.isAssignableFrom(argTypes[i])) {
+					args[i] = ((Wrapper) args[i]).unwrap();
+				}
+			}
+		}
         Object javaObject;
         if (meth.isStatic()) {
             javaObject = null; // don't need an object
