@@ -1079,6 +1079,7 @@ public abstract class ScriptableObject
         // Find out whether there are any methods that begin with
         // "js". If so, then only methods that begin with special
         // prefixes will be defined as JavaScript entities.
+        final String genericPrefix = "js_";
         final String functionPrefix = "jsFunction_";
         final String staticFunctionPrefix = "jsStaticFunction_";
         final String getterPrefix = "jsGet_";
@@ -1151,6 +1152,8 @@ public abstract class ScriptableObject
                     prefix = staticFunctionPrefix;
                 } else if (name.startsWith(getterPrefix)) {
                     prefix = getterPrefix;
+                } else if (name.startsWith(genericPrefix)) {
+					prefix = genericPrefix;
                 } else {
                     // note that setterPrefix is among the unhandled names here -
                     // we deal with that when we see the getter
