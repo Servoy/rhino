@@ -22,18 +22,19 @@ import java.lang.reflect.Modifier;
  *
  * @author Igor Bukanov
  */
-final class MemberBox implements Serializable {
+public final class MemberBox implements Serializable {
     private static final long serialVersionUID = 6358550398665688245L;
 
     private transient Member memberObject;
     transient Class<?>[] argTypes;
     transient boolean vararg;
+    transient Class<?> returnType;
 
     transient Function asGetterFunction;
     transient Function asSetterFunction;
     transient Object delegateTo;
 
-    MemberBox(Method method) {
+    public MemberBox(Method method) {
         init(method);
     }
 
@@ -45,6 +46,7 @@ final class MemberBox implements Serializable {
         this.memberObject = method;
         this.argTypes = method.getParameterTypes();
         this.vararg = method.isVarArgs();
+        this.returnType = method.getReturnType();
     }
 
     private void init(Constructor<?> constructor) {
@@ -53,7 +55,18 @@ final class MemberBox implements Serializable {
         this.vararg = constructor.isVarArgs();
     }
 
-    Method method() {
+	public Class<?>[] getParameterTypes() {
+		return argTypes;
+	}
+
+	/**
+	 * @return the returnType
+	 */
+	public Class<?> getReturnType() {
+		return returnType;
+	}
+	
+	public Method method() {
         return (Method) memberObject;
     }
 
@@ -65,7 +78,7 @@ final class MemberBox implements Serializable {
         return memberObject;
     }
 
-    boolean isMethod() {
+    public boolean isMethod() {
         return memberObject instanceof Method;
     }
 
@@ -85,7 +98,7 @@ final class MemberBox implements Serializable {
         return memberObject.getName();
     }
 
-    Class<?> getDeclaringClass() {
+    public Class<?> getDeclaringClass() {
         return memberObject.getDeclaringClass();
     }
 
