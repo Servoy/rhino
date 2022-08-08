@@ -29,7 +29,7 @@ public class NativeJavaMethod extends BaseFunction {
         this.methods = methods;
     }
 
-    NativeJavaMethod(MemberBox[] methods, String name) {
+    public NativeJavaMethod(MemberBox[] methods, String name) {
         this.functionName = name;
         this.methods = methods;
     }
@@ -38,6 +38,13 @@ public class NativeJavaMethod extends BaseFunction {
         this.functionName = name;
         this.methods = new MemberBox[] {method};
     }
+
+    /**
+	 * @return the methods
+	 */
+	public MemberBox[] getMethods() {
+		return methods;
+	}
 
     public NativeJavaMethod(Method method, String name) {
         this(new MemberBox(method), name);
