@@ -592,6 +592,11 @@ public class NativeJavaObject implements Scriptable, SymbolScriptable, Wrapper, 
             case JSTYPE_JAVA_ARRAY:
                 if (value instanceof Wrapper) {
                     value = ((Wrapper) value).unwrap();
+            		// if we have another wrapper that doesn't match, unwrap this
+            		// again
+            		if (!type.isInstance(value) && value instanceof Wrapper) {
+            			value = ((Wrapper) value).unwrap();
+            		}
                 }
                 if (type.isPrimitive()) {
                     if (type == Boolean.TYPE) {
@@ -616,8 +621,8 @@ public class NativeJavaObject implements Scriptable, SymbolScriptable, Wrapper, 
                         reportConversionError(value, type);
                     }
                     return coerceToNumber(type, value);
-                } else if (type.isInstance(value)) {
-                    return value;
+//                } else if (type.isInstance(value)) {
+//                    return value;
                 } else if (type == ScriptRuntime.DateClass && value instanceof NativeDate) {
                     double time = ((NativeDate) value).getJSTimeValue();
                     // XXX: This will replace NaN by 0
@@ -642,6 +647,8 @@ public class NativeJavaObject implements Scriptable, SymbolScriptable, Wrapper, 
                     value = ((Wrapper) value).unwrap();
                     if (type.isInstance(value)) return value;
                     reportConversionError(value, type);
+                } else if (type.isInstance(value)) {
+                	return value;
                 } else if (type.isInterface()
                         && (value instanceof NativeObject
                                 || (value instanceof Callable
