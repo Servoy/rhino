@@ -1984,7 +1984,16 @@ public class ScriptRuntime {
                 Scriptable withObj = scope.getPrototype();
                 if (withObj instanceof XMLObject) {
                     XMLObject xmlObj = (XMLObject) withObj;
-                    if (xmlObj.has(name, xmlObj)) {
+                    if (asFunctionCall) {
+                        result = getPropFunctionAndThisHelper(xmlObj, name,
+                                                              cx, withObj);
+                        thisObj = lastStoredScriptable(cx); // Must consume
+
+                        if (result != null) {
+                            break;
+                        }
+                    }
+                    else if (xmlObj.has(name, xmlObj)) {
                         // function this should be the target object of with
                         thisObj = xmlObj;
                         result = xmlObj.get(name, xmlObj);
