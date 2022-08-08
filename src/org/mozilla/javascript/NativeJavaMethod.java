@@ -269,6 +269,10 @@ public class NativeJavaMethod extends BaseFunction {
                         break;
                     }
                 }
+                if (c.isInstance(o)) {
+					javaObject = o;
+					break;
+				}
                 o = o.getPrototype();
             }
         }
