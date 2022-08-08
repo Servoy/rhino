@@ -3731,8 +3731,21 @@ public class ScriptRuntime {
             throw typeErrorById("msg.instanceof.not.object");
         }
 
+        if (a == null || a == Undefined.instance)
+			return false;
+
         // for primitive values on LHS, return false
-        if (!(a instanceof Scriptable)) return false;
+        // XXX we may want to change this so that
+        // 5 instanceof Number == true
+        if (!(a instanceof Scriptable)) {
+        	Scriptable converted = ScriptRuntime.toObject(cx, cx.topCallScope,
+        			a);
+        	if (converted != null) {
+        		a = converted;
+        	} else {
+        		return false;
+        	}
+        }
 
         return ((Scriptable) b).hasInstance((Scriptable) a);
     }
