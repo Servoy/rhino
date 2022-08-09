@@ -19,8 +19,5 @@ target/
 *~
 
 # eclipse
-.classpath
-.project
-test262
 bin/
 .settings/
