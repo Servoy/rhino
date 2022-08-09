@@ -1062,7 +1062,7 @@ public class NativeArray extends IdScriptableObject implements List,Wrapper {
         // We want always this to be default to this, just as native java array
 //        if (toSource) {
             result.append('[');
-            separator = ", ";
+            separator = ",";
 //        } else {
 //            separator = ",";
 //        }
