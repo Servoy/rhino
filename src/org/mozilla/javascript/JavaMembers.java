@@ -391,9 +391,9 @@ public class JavaMembers {
                                 if (isPublic(mods) || isProtected(mods) || includePrivate) {
                                     MethodSignature sig = new MethodSignature(method);
                                     if (!map.containsKey(sig)) {
-                                        if (includePrivate && !method.isAccessible())
-                                            method.setAccessible(true);
-                                        map.put(sig, method);
+                                    	if (makeAccessible(method, includePrivate )) {
+	                                        map.put(sig, method);
+                                    	}
                                     }
                                 }
                             }
@@ -441,7 +441,16 @@ public class JavaMembers {
         }
     }
 
-    void discoverPublicMethods(Class<?> clazz, Map<MethodSignature, Method> map) {
+    protected boolean makeAccessible(AccessibleObject method, boolean includePrivate) {
+    	try {
+			if (!method.isAccessible()) method.setAccessible(true);
+		} catch (RuntimeException e) {
+			return false;
+		}
+    	return true;
+	}
+
+	void discoverPublicMethods(Class<?> clazz, Map<MethodSignature, Method> map) {
         Method[] methods = clazz.getMethods();
         for (Method method : methods) {
             registerMethod(map, method);
@@ -753,13 +762,8 @@ public class JavaMembers {
                 AccessibleObject.setAccessible(cons, true);
 
                 return cons;
-            } catch (SecurityException e) {
-                // Fall through to !includePrivate case
-                Context.reportWarning(
-                        "Could not access constructor "
-                                + " of class "
-                                + cl.getName()
-                                + " due to lack of privileges.");
+            }  catch (RuntimeException e) {
+          	  // very likely a InaccessibleObjectException we should just ignore this
             }
         }
         return cl.getConstructors();
