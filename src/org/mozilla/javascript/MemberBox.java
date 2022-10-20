@@ -263,7 +263,7 @@ public final class MemberBox implements Serializable {
         int modifiers = method.getModifiers();
         if (Modifier.isPublic(modifiers) && !Modifier.isStatic(modifiers)) {
             Class<?> c = method.getDeclaringClass();
-            if (!Modifier.isPublic(c.getModifiers())) {
+//            if (!Modifier.isPublic(c.getModifiers())) {
                 String name = method.getName();
                 Class<?>[] intfs = c.getInterfaces();
                 for (int i = 0, N = intfs.length; i != N; ++i) {
@@ -292,7 +292,7 @@ public final class MemberBox implements Serializable {
                         } catch (SecurityException ex) {
                         }
                     }
-                }
+//                }
             }
         }
         return null;
