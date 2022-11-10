@@ -10,6 +10,7 @@ import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.io.Serializable;
+import java.lang.reflect.AccessibleObject;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Member;
@@ -218,7 +219,7 @@ public final class MemberBox implements Serializable {
             try {
                 return method.invoke(target, args);
             } catch (IllegalAccessException ex) {
-                Method accessible = searchAccessibleMethod(method, argTypes);
+                Method accessible = searchAccessibleMethod(method, argTypes, target);
                 if (accessible != null) {
                     memberObject = accessible;
                     method = accessible;
@@ -259,7 +260,7 @@ public final class MemberBox implements Serializable {
         }
     }
 
-    private static Method searchAccessibleMethod(Method method, Class<?>[] params) {
+    private static Method searchAccessibleMethod(Method method, Class<?>[] params, Object target) {
         int modifiers = method.getModifiers();
         if (Modifier.isPublic(modifiers) && !Modifier.isStatic(modifiers)) {
             Class<?> c = method.getDeclaringClass();
@@ -285,7 +286,7 @@ public final class MemberBox implements Serializable {
                         try {
                             Method m = c.getMethod(name, params);
                             int mModifiers = m.getModifiers();
-                            if (Modifier.isPublic(mModifiers) && !Modifier.isStatic(mModifiers)) {
+                            if (Modifier.isPublic(mModifiers) && !Modifier.isStatic(mModifiers) && canAccess(m, target)) {
                                 return m;
                             }
                         } catch (NoSuchMethodException ex) {
@@ -296,6 +297,24 @@ public final class MemberBox implements Serializable {
             }
         }
         return null;
+    }
+    
+    private static final Method canAccess;
+    static {
+    	Method method = null;
+    	try {
+    		method = AccessibleObject.class.getMethod("canAccess", Object.class);
+		} catch (NoSuchMethodException | SecurityException e) {
+		}
+    	canAccess = method;
+    }
+    private static boolean canAccess(Method method, Object target) {
+    	if (canAccess != null)
+			try {
+				return ((Boolean)canAccess.invoke(method, target)).booleanValue();
+			} catch (IllegalAccessException | IllegalArgumentException | InvocationTargetException e) {
+			}
+    	return true;
     }
 
     private void readObject(ObjectInputStream in) throws IOException, ClassNotFoundException {
