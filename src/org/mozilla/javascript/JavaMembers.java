@@ -592,9 +592,9 @@ public class JavaMembers {
 		for (String name : ht.keySet()) {
 		    // Is this a getter?
 		    boolean memberIsGetMethod = name.startsWith("get");
-		    boolean memberIsSetMethod = name.startsWith("set");
+//		    boolean memberIsSetMethod = name.startsWith("set");
 		    boolean memberIsIsMethod = name.startsWith("is");
-		    if (memberIsGetMethod || memberIsIsMethod || memberIsSetMethod) {
+		    if (memberIsGetMethod || memberIsIsMethod /*|| memberIsSetMethod*/) {
 		        // Double check name component.
 		        String nameComponent = name.substring(memberIsIsMethod ? 2 : 3);
 		        if (nameComponent.length() == 0) continue;
