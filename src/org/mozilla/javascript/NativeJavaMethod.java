@@ -558,7 +558,7 @@ public class NativeJavaMethod extends BaseFunction {
             Class<?> type1 = vararg1 && j >= sig1.length ? sig1[sig1.length - 1] : sig1[j];
             Class<?> type2 = vararg2 && j >= sig2.length ? sig2[sig2.length - 1] : sig2[j];
 			if (vararg1 && vararg2 && j == (sig2.length - 1) && type2.isArray()) type2 = type2.getComponentType();
-			//if (vararg1 && vararg2 && j == (sig1.length - 1) && type1.isArray()) type1 = type1.getComponentType();
+			if (vararg1 && vararg2 && j == (sig1.length - 1) && type1.isArray()) type1 = type1.getComponentType();
             if (type1 == type2) {
                 continue;
             }
@@ -618,7 +618,7 @@ public class NativeJavaMethod extends BaseFunction {
 	 */
 	private static boolean exactFit(Class type, Object arg) {
 		if (arg != null) {
-			//if (arg instanceof Wrapper) arg = ((Wrapper) arg).unwrap();
+			if (arg instanceof Wrapper) arg = ((Wrapper) arg).unwrap();
 			if (type.getClass() == arg.getClass()) {
 				return true;
 			}
