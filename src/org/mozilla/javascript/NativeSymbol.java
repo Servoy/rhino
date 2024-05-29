@@ -67,7 +67,7 @@ public class NativeSymbol extends IdScriptableObject implements Symbol {
         this.symbolData = null;
     }
 
-    private NativeSymbol(SymbolKey key) {
+    NativeSymbol(SymbolKey key) {
         this.key = key;
         this.symbolData = this;
     }
@@ -344,7 +344,7 @@ public class NativeSymbol extends IdScriptableObject implements Symbol {
         Map<String, NativeSymbol> map =
                 (Map<String, NativeSymbol>) top.getAssociatedValue(GLOBAL_TABLE_KEY);
         if (map == null) {
-            map = new HashMap<String, NativeSymbol>();
+            map = new HashMap<>();
             top.associateValue(GLOBAL_TABLE_KEY, map);
         }
         return map;

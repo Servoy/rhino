@@ -24,7 +24,6 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import javax.lang.model.SourceVersion;
 
 /**
  * @author Mike Shaver
@@ -34,8 +33,7 @@ import javax.lang.model.SourceVersion;
  */
 public class JavaMembers {
 
-    private static final boolean STRICT_REFLECTIVE_ACCESS =
-            SourceVersion.latestSupported().ordinal() > 8;
+    private static final boolean STRICT_REFLECTIVE_ACCESS = isModularJava();
 
     private static final Permission allPermission = new AllPermission();
 
@@ -44,19 +42,29 @@ public class JavaMembers {
     }
 
     JavaMembers(Scriptable scope, Class<?> cl, boolean includeProtected) {
-        try {
-            Context cx = ContextFactory.getGlobal().enterContext();
+        try (Context cx = ContextFactory.getGlobal().enterContext()) {
             ClassShutter shutter = cx.getClassShutter();
             if (shutter != null && !shutter.visibleToScripts(cl.getName())) {
                 throw Context.reportRuntimeErrorById("msg.access.prohibited", cl.getName());
             }
-            this.members = new HashMap<String, Object>();
-            this.staticMembers = new HashMap<String, Object>();
+            this.members = new HashMap<>();
+            this.staticMembers = new HashMap<>();
             this.cl = cl;
             boolean includePrivate = cx.hasFeature(Context.FEATURE_ENHANCED_JAVA_ACCESS);
-            reflect(scope, includeProtected, includePrivate);
-        } finally {
-            Context.exit();
+            reflect(cx, scope, includeProtected, includePrivate);
+        }
+    }
+
+    /**
+     * This method returns true if we are on a "modular" version of Java (Java 11 or up). It does
+     * not use the SourceVersion class because this is not present on Android.
+     */
+    private static boolean isModularJava() {
+        try {
+            Class.class.getMethod("getModule");
+            return true;
+        } catch (NoSuchMethodException e) {
+            return false;
         }
     }
 
@@ -225,7 +233,7 @@ public class JavaMembers {
 
     public Object[] getIds(boolean isStatic) {
         Map<String, Object> map = isStatic ? staticMembers : members;
-        return map.keySet().toArray(new Object[map.size()]);
+        return map.keySet().toArray(new Object[0]);
     }
 
     boolean isDeprecated(String name,boolean isStatic)
@@ -498,7 +506,8 @@ public class JavaMembers {
         }
     }
 
-    private void reflect(Scriptable scope, boolean includeProtected, boolean includePrivate) {
+    private void reflect(
+            Context cx, Scriptable scope, boolean includeProtected, boolean includePrivate) {
         // We reflect methods first, because we want overloaded field/method
         // names to be allocated to the NativeJavaMethod before the field
         // gets in the way.
@@ -551,7 +560,7 @@ public class JavaMembers {
                 }
                 NativeJavaMethod fun = new NativeJavaMethod(methodBoxes);
                 if (scope != null) {
-                    ScriptRuntime.setFunctionProtoAndParent(fun, scope);
+                    ScriptRuntime.setFunctionProtoAndParent(fun, cx, scope, false);
                 }
                 ht.put(entry.getKey(), fun);
             }
@@ -772,7 +781,7 @@ public class JavaMembers {
     private Field[] getAccessibleFields(boolean includeProtected, boolean includePrivate) {
         if (includePrivate || includeProtected) {
             try {
-                List<Field> fieldsList = new ArrayList<Field>();
+                List<Field> fieldsList = new ArrayList<>();
                 Class<?> currentClass = cl;
 
                 while (currentClass != null) {
@@ -782,7 +791,7 @@ public class JavaMembers {
                     currentClass = currentClass.getSuperclass();
                 }
 
-                return fieldsList.toArray(new Field[fieldsList.size()]);
+                return fieldsList.toArray(new Field[0]);
             } catch (SecurityException e) {
                 // fall through to !includePrivate case
             }
@@ -896,7 +905,7 @@ public class JavaMembers {
         Map<String, FieldAndMethods> ht = isStatic ? staticFieldAndMethods : fieldAndMethods;
         if (ht == null) return null;
         int len = ht.size();
-        Map<String, FieldAndMethods> result = new HashMap<String, FieldAndMethods>(len);
+        Map<String, FieldAndMethods> result = new HashMap<>(len);
         for (FieldAndMethods fam : ht.values()) {
             FieldAndMethods famNew = new FieldAndMethods(scope, fam.methods, fam.field);
             famNew.javaObject = javaObject;

@@ -12,7 +12,6 @@ import java.awt.Color;
 import java.awt.Component;
 import java.awt.Container;
 import java.awt.Dimension;
-import java.awt.Event;
 import java.awt.EventQueue;
 import java.awt.Font;
 import java.awt.FontMetrics;
@@ -1865,7 +1864,7 @@ class FileHeader extends JPanel implements MouseListener {
     /** Called when a mouse button is released. */
     @Override
     public void mouseReleased(MouseEvent e) {
-        if (e.getComponent() == this && (e.getModifiers() & MouseEvent.BUTTON1_MASK) != 0) {
+        if (e.getComponent() == this && e.getButton() == MouseEvent.BUTTON1) {
             int y = e.getY();
             Font font = fileWindow.textArea.getFont();
             FontMetrics metrics = getFontMetrics(font);
@@ -2474,25 +2473,7 @@ class MyTreeTable extends JTreeTable {
             // selection remaining the same. To avoid this, we
             // only dispatch when the modifiers are 0 (or the left mouse
             // button).
-            if (me.getModifiers() == 0
-                    || ((me.getModifiers() & (InputEvent.BUTTON1_MASK | 1024)) != 0
-                            && (me.getModifiers()
-                                            & (InputEvent.SHIFT_MASK
-                                                    | InputEvent.CTRL_MASK
-                                                    | InputEvent.ALT_MASK
-                                                    | InputEvent.BUTTON2_MASK
-                                                    | InputEvent.BUTTON3_MASK
-                                                    | 64
-                                                    | // SHIFT_DOWN_MASK
-                                                    128
-                                                    | // CTRL_DOWN_MASK
-                                                    512
-                                                    | // ALT_DOWN_MASK
-                                                    2048
-                                                    | // BUTTON2_DOWN_MASK
-                                                    4096 // BUTTON3_DOWN_MASK
-                                            ))
-                                    == 0)) {
+            if (me.getButton() == MouseEvent.BUTTON1 && me.getModifiersEx() == 0) {
                 int row = rowAtPoint(me.getPoint());
                 for (int counter = getColumnCount() - 1; counter >= 0; counter--) {
                     if (TreeTableModel.class == getColumnClass(counter)) {
@@ -2501,11 +2482,12 @@ class MyTreeTable extends JTreeTable {
                                         MyTreeTable.this.tree,
                                         me.getID(),
                                         me.getWhen(),
-                                        me.getModifiers(),
+                                        me.getModifiersEx(),
                                         me.getX() - getCellRect(row, counter, true).x,
                                         me.getY(),
                                         me.getClickCount(),
-                                        me.isPopupTrigger());
+                                        me.isPopupTrigger(),
+                                        me.getButton());
                         MyTreeTable.this.tree.dispatchEvent(newME);
                         break;
                     }
@@ -2920,7 +2902,8 @@ class Menubar extends JMenuBar implements ActionListener {
                 item.addActionListener(this);
                 fileMenu.add(item);
                 if (fileAccelerators[i] != 0) {
-                    KeyStroke k = KeyStroke.getKeyStroke(fileAccelerators[i], Event.CTRL_MASK);
+                    KeyStroke k =
+                            KeyStroke.getKeyStroke(fileAccelerators[i], InputEvent.CTRL_DOWN_MASK);
                     item.setAccelerator(k);
                 }
             }
@@ -2930,7 +2913,8 @@ class Menubar extends JMenuBar implements ActionListener {
             item.addActionListener(this);
             editMenu.add(item);
             if (editAccelerators[i] != 0) {
-                KeyStroke k = KeyStroke.getKeyStroke(editAccelerators[i], Event.CTRL_MASK);
+                KeyStroke k =
+                        KeyStroke.getKeyStroke(editAccelerators[i], InputEvent.CTRL_DOWN_MASK);
                 item.setAccelerator(k);
             }
         }

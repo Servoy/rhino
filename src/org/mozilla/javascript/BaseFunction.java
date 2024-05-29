@@ -22,11 +22,20 @@ public class BaseFunction extends IdScriptableObject implements Function {
     private static final String FUNCTION_CLASS = "Function";
     static final String GENERATOR_FUNCTION_CLASS = "__GeneratorFunction";
 
-    static void init(Scriptable scope, boolean sealed) {
+    static void init(Context cx, Scriptable scope, boolean sealed) {
         BaseFunction obj = new BaseFunction();
         // Function.prototype attributes: see ECMA 15.3.3.1
         obj.prototypePropertyAttributes = DONTENUM | READONLY | PERMANENT;
+        if (cx.getLanguageVersion() >= Context.VERSION_ES6) {
+            obj.setStandardPropertyAttributes(READONLY | DONTENUM);
+        }
         obj.exportAsJSClass(MAX_PROTOTYPE_ID, scope, sealed);
+    }
+
+    /** @deprecated Use {@link #init(Context, Scriptable, boolean)} instead */
+    @Deprecated
+    static void init(Scriptable scope, boolean sealed) {
+        init(Context.getContext(), scope, sealed);
     }
 
     static Object initAsGeneratorFunction(Scriptable scope, boolean sealed) {
@@ -91,7 +100,7 @@ public class BaseFunction extends IdScriptableObject implements Function {
         throw ScriptRuntime.typeErrorById("msg.instanceof.bad.prototype", getFunctionName());
     }
 
-    private static final int Id_length = 1,
+    protected static final int Id_length = 1,
             Id_arity = 2,
             Id_name = 3,
             Id_prototype = 4,
@@ -160,7 +169,9 @@ public class BaseFunction extends IdScriptableObject implements Function {
             case Id_arity:
                 return arityPropertyAttributes >= 0 ? getArity() : NOT_FOUND;
             case Id_name:
-                return namePropertyAttributes >= 0 ? getFunctionName() : NOT_FOUND;
+                return namePropertyAttributes >= 0
+                        ? (nameValue != null ? nameValue : getFunctionName())
+                        : NOT_FOUND;
             case Id_prototype:
                 return getPrototypeProperty();
             case Id_arguments:
@@ -191,6 +202,11 @@ public class BaseFunction extends IdScriptableObject implements Function {
             case Id_name:
                 if (value == NOT_FOUND) {
                     namePropertyAttributes = -1;
+                    nameValue = null;
+                } else if (value instanceof CharSequence) {
+                    nameValue = ScriptRuntime.toString(value);
+                } else {
+                    nameValue = "";
                 }
                 return;
             case Id_arity:
@@ -509,7 +525,8 @@ public class BaseFunction extends IdScriptableObject implements Function {
             return prototypeProperty;
         }
         NativeObject obj = new NativeObject();
-        obj.defineProperty("constructor", this, DONTENUM);
+        obj.setParentScope(getParentScope());
+
         // put the prototype property into the object now, then in the
         // wacky case of a user defining a function Object(), we don't
         // get an infinite loop trying to find the prototype.
@@ -519,6 +536,8 @@ public class BaseFunction extends IdScriptableObject implements Function {
             // not the one we just made, it must remain grounded
             obj.setPrototype(proto);
         }
+
+        obj.defineProperty("constructor", this, DONTENUM);
         return obj;
     }
 
@@ -638,6 +657,7 @@ public class BaseFunction extends IdScriptableObject implements Function {
 
     private Object prototypeProperty;
     private Object argumentsObj = NOT_FOUND;
+    private String nameValue = null;
     private boolean isGeneratorFunction = false;
 
     // For function object instances, attributes are
@@ -646,6 +666,6 @@ public class BaseFunction extends IdScriptableObject implements Function {
     private int prototypePropertyAttributes = PERMANENT | DONTENUM;
     private int argumentsAttributes = PERMANENT | DONTENUM;
     private int arityPropertyAttributes = PERMANENT | READONLY | DONTENUM;
-    private int namePropertyAttributes = PERMANENT | READONLY | DONTENUM;
+    private int namePropertyAttributes = READONLY | DONTENUM;
     private int lengthPropertyAttributes = PERMANENT | READONLY | DONTENUM;
 }

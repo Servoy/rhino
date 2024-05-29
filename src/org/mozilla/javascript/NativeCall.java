@@ -9,27 +9,31 @@ package org.mozilla.javascript;
 /**
  * This class implements the activation object.
  *
- * See ECMA 10.1.6
+ * <p>See ECMA 10.1.6
  *
  * @see org.mozilla.javascript.Arguments
  * @author Norris Boyd
  */
-public final class NativeCall extends IdScriptableObject
-{
+public final class NativeCall extends IdScriptableObject {
     private static final long serialVersionUID = -7471457301304454454L;
 
     private static final Object CALL_TAG = "Call";
 
-    static void init(Scriptable scope, boolean sealed)
-    {
+    static void init(Scriptable scope, boolean sealed) {
         NativeCall obj = new NativeCall();
         obj.exportAsJSClass(MAX_PROTOTYPE_ID, scope, sealed);
     }
 
-    NativeCall() { }
+    NativeCall() {}
 
-    NativeCall(NativeFunction function, Scriptable scope, Object[] args, boolean isArrow, boolean isStrict)
-    {
+    NativeCall(
+            NativeFunction function,
+            Context cx,
+            Scriptable scope,
+            Object[] args,
+            boolean isArrow,
+            boolean isStrict,
+            boolean argsHasRest) {
         this.function = function;
 
         setParentScope(scope);
@@ -42,11 +46,30 @@ public final class NativeCall extends IdScriptableObject
         int paramAndVarCount = function.getParamAndVarCount();
         int paramCount = function.getParamCount();
         if (paramAndVarCount != 0) {
-            for (int i = 0; i < paramCount; ++i) {
-                String name = function.getParamOrVarName(i);
-                Object val = i < args.length ? args[i]
-                                             : Undefined.instance;
-                defineProperty(name, val, PERMANENT);
+            if (argsHasRest) {
+                Object[] vals;
+                if (args.length >= paramCount) {
+                    vals = new Object[args.length - paramCount];
+                    System.arraycopy(args, paramCount, vals, 0, args.length - paramCount);
+                } else {
+                    vals = ScriptRuntime.emptyArgs;
+                }
+
+                for (int i = 0; i < paramCount; ++i) {
+                    String name = function.getParamOrVarName(i);
+                    Object val = i < args.length ? args[i] : Undefined.instance;
+                    defineProperty(name, val, PERMANENT);
+                }
+                defineProperty(
+                        function.getParamOrVarName(paramCount),
+                        cx.newArray(scope, vals),
+                        PERMANENT);
+            } else {
+                for (int i = 0; i < paramCount; ++i) {
+                    String name = function.getParamOrVarName(i);
+                    Object val = i < args.length ? args[i] : Undefined.instance;
+                    defineProperty(name, val, PERMANENT);
+                }
             }
         }
 
@@ -64,7 +87,7 @@ public final class NativeCall extends IdScriptableObject
                     if (function.getParamOrVarConst(i)) {
                         defineProperty(name, Undefined.instance, CONST);
                     } else if (!(function instanceof InterpretedFunction)
-                                || ((InterpretedFunction) function).hasFunctionNamed(name)) {
+                            || ((InterpretedFunction) function).hasFunctionNamed(name)) {
                         defineProperty(name, Undefined.instance, PERMANENT);
                     }
                 }
@@ -73,24 +96,22 @@ public final class NativeCall extends IdScriptableObject
     }
 
     @Override
-    public String getClassName()
-    {
+    public String getClassName() {
         return "Call";
     }
 
     @Override
-    protected int findPrototypeId(String s)
-    {
+    protected int findPrototypeId(String s) {
         return s.equals("constructor") ? Id_constructor : 0;
     }
 
     @Override
-    protected void initPrototypeId(int id)
-    {
+    protected void initPrototypeId(int id) {
         String s;
         int arity;
         if (id == Id_constructor) {
-            arity=1; s="constructor";
+            arity = 1;
+            s = "constructor";
         } else {
             throw new IllegalArgumentException(String.valueOf(id));
         }
@@ -98,9 +119,8 @@ public final class NativeCall extends IdScriptableObject
     }
 
     @Override
-    public Object execIdCall(IdFunctionObject f, Context cx, Scriptable scope,
-                             Scriptable thisObj, Object[] args)
-    {
+    public Object execIdCall(
+            IdFunctionObject f, Context cx, Scriptable scope, Scriptable thisObj, Object[] args) {
         if (!f.hasTag(CALL_TAG)) {
             return super.execIdCall(f, cx, scope, thisObj, args);
         }
@@ -123,9 +143,7 @@ public final class NativeCall extends IdScriptableObject
         }
     }
 
-    private static final int
-        Id_constructor   = 1,
-        MAX_PROTOTYPE_ID = 1;
+    private static final int Id_constructor = 1, MAX_PROTOTYPE_ID = 1;
 
     NativeFunction function;
     Object[] originalArgs;
@@ -134,4 +152,3 @@ public final class NativeCall extends IdScriptableObject
 
     transient NativeCall parentActivationCall;
 }
-

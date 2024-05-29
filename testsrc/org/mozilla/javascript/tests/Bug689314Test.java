@@ -2,9 +2,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-/**
- * 
- */
+/** */
 package org.mozilla.javascript.tests;
 
 import static org.junit.Assert.assertEquals;
@@ -18,11 +16,9 @@ import org.mozilla.javascript.ErrorReporter;
 import org.mozilla.javascript.Parser;
 import org.mozilla.javascript.ast.AstRoot;
 
-/**
- * @author André Bargull
- * 
- */
+/** @author André Bargull */
 public class Bug689314Test {
+
     private Context cx;
 
     @Before
@@ -49,21 +45,20 @@ public class Bug689314Test {
     }
 
     @Test
-    public void testToSourceFunctionStatement() {
+    public void toSourceFunctionStatement() {
         assertEquals("function F() 1 + 2;\n", toSource("function F() 1+2"));
-        assertEquals("function F() {\n  return 1 + 2;\n}\n",
-                toSource("function F() {return 1+2}"));
+        assertEquals("function F() {\n  return 1 + 2;\n}\n", toSource("function F() {return 1+2}"));
     }
 
     @Test
-    public void testToSourceFunctionExpression() {
-        assertEquals("var x = function() 1 + 2;\n",
-                toSource("var x = function () 1+2"));
-        assertEquals("var x = function() {\n  return 1 + 2;\n};\n",
+    public void toSourceFunctionExpression() {
+        assertEquals("var x = function() 1 + 2;\n", toSource("var x = function () 1+2"));
+        assertEquals(
+                "var x = function() {\n  return 1 + 2;\n};\n",
                 toSource("var x = function () {return 1+2}"));
-        assertEquals("var x = function F() 1 + 2;\n",
-                toSource("var x = function F() 1+2"));
-        assertEquals("var x = function F() {\n  return 1 + 2;\n};\n",
+        assertEquals("var x = function F() 1 + 2;\n", toSource("var x = function F() 1+2"));
+        assertEquals(
+                "var x = function F() {\n  return 1 + 2;\n};\n",
                 toSource("var x = function F() {return 1+2}"));
     }
 }

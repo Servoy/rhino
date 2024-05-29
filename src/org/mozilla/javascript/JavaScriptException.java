@@ -37,25 +37,36 @@ public class JavaScriptException extends RhinoException {
     public JavaScriptException(Object value, String sourceName, int lineNumber) {
         recordErrorOrigin(sourceName, lineNumber, null, 0);
         this.value = value;
-        // Fill in fileName and lineNumber automatically when not specified
-        // explicitly, see Bugzilla issue #342807
-        if (value instanceof Scriptable
-                && Context.getContext().hasFeature(Context.FEATURE_LOCATION_INFORMATION_IN_ERROR)) {
+        // try to extract the cause. Value can be either a (wrapped) java.lang.Throwable
+        // or a NativeError, that may contain the causing javaException
+        Object javaCause = value;
+        if (value instanceof Scriptable) {
         	Scriptable obj = (Scriptable) value;
         	while(obj != null && !(obj instanceof NativeError)) {
         		obj = obj.getPrototype();
         	}
         	if (obj instanceof NativeError) {
 	            NativeError error = (NativeError) obj;
-	            if (!error.has("fileName", error)) {
-	                error.put("fileName", error, sourceName);
+	            javaCause = error.get("javaException", error);
+	            // Fill in fileName and lineNumber automatically when not specified
+	            // explicitly, see Bugzilla issue #342807
+	            if (Context.getContext().hasFeature(Context.FEATURE_LOCATION_INFORMATION_IN_ERROR)) {
+	                if (!error.has("fileName", error)) {
+	                    error.put("fileName", error, sourceName);
+	                }
+	                if (!error.has("lineNumber", error)) {
+	                    error.put("lineNumber", error, Integer.valueOf(lineNumber));
+	                }
+	                // set stack property, see bug #549604
+	                error.setStackProvider(this);
 	            }
-	            if (!error.has("lineNumber", error)) {
-	                error.put("lineNumber", error, Integer.valueOf(lineNumber));
-	            }
-	            // set stack property, see bug #549604
-	            error.setStackProvider(this);
         	}
+        }
+        if (javaCause instanceof Wrapper) {
+            javaCause = ((Wrapper) javaCause).unwrap();
+        }
+        if (javaCause instanceof Throwable) {
+            this.initCause((Throwable) javaCause);
         }
 
         // generate details string when exception is first created,

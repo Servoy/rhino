@@ -186,6 +186,7 @@ class CodeGenerator extends Icode {
         itsData.argNames = scriptOrFn.getParamAndVarNames();
         itsData.argIsConst = scriptOrFn.getParamAndVarConst();
         itsData.argCount = scriptOrFn.getParamCount();
+        itsData.argsHasRest = scriptOrFn.hasRestParameter();
 
         itsData.encodedSourceStart = scriptOrFn.getEncodedSourceStart();
         itsData.encodedSourceEnd = scriptOrFn.getEncodedSourceEnd();
@@ -473,7 +474,7 @@ class CodeGenerator extends Icode {
                 {
                     int localIndex = getLocalBlockRef(node);
                     int scopeIndex = node.getExistingIntProp(Node.CATCH_SCOPE_PROP);
-                    String name = child.getString();
+                    String name = child.getType() == Token.NAME ? child.getString() : "";
                     child = child.getNext();
                     visitExpression(child, 0); // load expression object
                     addStringPrefix(name);

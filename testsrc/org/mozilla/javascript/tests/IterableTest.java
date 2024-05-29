@@ -3,9 +3,10 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 package org.mozilla.javascript.tests;
 
-import junit.framework.TestCase;
+import static org.junit.Assert.assertEquals;
+
+import org.junit.Test;
 import org.mozilla.javascript.Context;
-import org.mozilla.javascript.ContextFactory;
 import org.mozilla.javascript.EcmaError;
 import org.mozilla.javascript.Scriptable;
 import org.mozilla.javascript.ScriptableObject;
@@ -18,18 +19,17 @@ import org.mozilla.javascript.Undefined;
 /**
  * Tests for host objects implementing the iterable protocol.
  *
- * See https://github.com/mozilla/rhino/pull/599
+ * <p>See https://github.com/mozilla/rhino/pull/599
  *
  * @author Stijn Kliemesch
  */
-public class IterableTest extends TestCase {
+public class IterableTest {
 
     public static final class FooWithoutSymbols extends FooBoilerplate {
 
         public FooWithoutSymbols(final Scriptable scope) {
             super(scope);
         }
-
     }
 
     public static final class FooWithSymbols extends SymbolFooBoilerplate {
@@ -42,7 +42,6 @@ public class IterableTest extends TestCase {
         public boolean has(Symbol key, Scriptable start) {
             return false;
         }
-
     }
 
     public static final class FooWithArrayIterator extends SymbolFooBoilerplate {
@@ -74,9 +73,7 @@ public class IterableTest extends TestCase {
         public Object get(Symbol key, Scriptable start) {
             if (SymbolKey.ITERATOR.equals(key)) {
                 return ScriptableObject.getProperty(
-                        TopLevel.getArrayPrototype(scope),
-                        SymbolKey.ITERATOR
-                );
+                        ScriptableObject.getArrayPrototype(scope), SymbolKey.ITERATOR);
             }
             throw new IllegalStateException();
         }
@@ -85,108 +82,112 @@ public class IterableTest extends TestCase {
         public boolean has(Symbol key, Scriptable start) {
             return SymbolKey.ITERATOR.equals(key);
         }
-
     }
 
-    private final Scriptable top;
+    /**
+     * Regression test for a Scriptable not implementing SymbolScriptable, used in for a for-of
+     * loop.
+     *
+     * <p>Note: no spec is (knowingly) being adhered to with the "expected" in this test, merely the
+     * situation as-is being "noted".
+     */
+    @Test
+    public void forOfUsingNonSymbolScriptable() {
+        Utils.runWithAllOptimizationLevels(
+                cx -> {
+                    cx.setLanguageVersion(Context.VERSION_ES6);
+                    ScriptableObject scope = cx.initStandardObjects();
 
-    static {
-        ContextFactory.initGlobal(new ContextFactory() {
-            @Override
-            protected Context makeContext() {
-                return new Context(this) {
-                    {
-                        this.setLanguageVersion(VERSION_ES6);
+                    Scriptable foo = new FooWithoutSymbols(scope);
+                    ScriptableObject.putProperty(scope, "foo", foo);
+
+                    try {
+                        cx.evaluateString(
+                                scope,
+                                "(function(){for(x of foo) { return x; }})();",
+                                "<eval>",
+                                0,
+                                null);
+
+                    } catch (Throwable t) {
+                        assertEquals(t.getClass(), EcmaError.class);
+                        assertEquals(t.getMessage(), "TypeError: [object Object] is not iterable");
                     }
-                };
-            }
-        });
-    }
 
-    public IterableTest() {
-        Context cx = Context.enter();
-        try {
-            top = cx.initSafeStandardObjects();
-        } finally {
-            Context.exit();
-        }
+                    return null;
+                });
     }
 
     /**
-     * Regression test for a Scriptable not implementing SymbolScriptable, used
-     * in for a for-of loop.
+     * Regression test for a Scriptable implementing SymbolScriptable that doesn't implement the
+     * iterable protocol, used in for a for-of loop.
      *
-     * Note: no spec is (knowingly) being adhered to with the "expected" in this
-     * test, merely the situation as-is being "noted".
+     * <p>Note: no spec is (knowingly) being adhered to with the "expected" in this test, merely the
+     * situation as-is being "noted".
      */
-    public void testForOfUsingNonSymbolScriptable() {
+    @Test
+    public void forOfUsingNonIterable() {
+        Utils.runWithAllOptimizationLevels(
+                cx -> {
+                    cx.setLanguageVersion(Context.VERSION_ES6);
+                    ScriptableObject scope = cx.initStandardObjects();
 
-        Context cx = Context.enter();
-        try {
-            Scriptable foo = new FooWithoutSymbols(top);
-            ScriptableObject.putProperty(top, "foo", foo);
+                    Scriptable foo = new FooWithSymbols(scope);
+                    ScriptableObject.putProperty(scope, "foo", foo);
 
-            try {
-                cx.evaluateString(top, "(function(){for(x of foo) { return x; }})();", "<eval>", 0, null);
+                    try {
+                        cx.evaluateString(
+                                scope,
+                                "(function(){for(x of foo) { return x; }})();",
+                                "<eval>",
+                                0,
+                                null);
+                    } catch (Throwable t) {
+                        assertEquals(t.getClass(), EcmaError.class);
+                        assertEquals(t.getMessage(), "TypeError: [object Object] is not iterable");
+                    }
 
-            } catch (Throwable t) {
-                assertEquals(t.getClass(), EcmaError.class);
-                assertEquals(t.getMessage(), "TypeError: [object Object] is not iterable");
-            }
-        } finally {
-            Context.exit();
-        }
-    }
-
-    /**
-     * Regression test for a Scriptable implementing SymbolScriptable that
-     * doesn't implement the iterable protocol, used in for a for-of loop.
-     *
-     * Note: no spec is (knowingly) being adhered to with the "expected" in this
-     * test, merely the situation as-is being "noted".
-     */
-    public void testForOfUsingNonIterable() {
-        Context cx = Context.enter();
-        try {
-            Scriptable foo = new FooWithSymbols(top);
-            ScriptableObject.putProperty(top, "foo", foo);
-
-            try {
-                cx.evaluateString(top, "(function(){for(x of foo) { return x; }})();", "<eval>", 0, null);
-            } catch (Throwable t) {
-                assertEquals(t.getClass(), EcmaError.class);
-                assertEquals(t.getMessage(), "TypeError: [object Object] is not iterable");
-            }
-        } finally {
-            Context.exit();
-        }
+                    return null;
+                });
     }
 
     /**
      * Test for a host object to be able to supply an iterator, specifically
      * Array.prototype[Symbol.iterator], for a for-of loop.
      */
-    public void testForOfUsingArrayIterator() {
-        Context cx = Context.enter();
-        try {
-            Scriptable foo = new FooWithArrayIterator(top);
-            ScriptableObject.putProperty(top, "foo", foo);
+    @Test
+    public void forOfUsingArrayIterator() {
+        Utils.runWithAllOptimizationLevels(
+                cx -> {
+                    cx.setLanguageVersion(Context.VERSION_ES6);
+                    ScriptableObject scope = cx.initStandardObjects();
 
-            assertEquals(
-                    true,
-                    cx.evaluateString(top, "foo[Symbol.iterator] === Array.prototype[Symbol.iterator]", "<eval>", 0, null)
-            );
+                    Scriptable foo = new FooWithArrayIterator(scope);
+                    ScriptableObject.putProperty(scope, "foo", foo);
 
-            assertEquals(
-                    123,
-                    cx.evaluateString(top, "(function(){for(x of foo) { return x; }})();", "<eval>", 0, null)
-            );
-        } finally {
-            Context.exit();
-        }
+                    assertEquals(
+                            true,
+                            cx.evaluateString(
+                                    scope,
+                                    "foo[Symbol.iterator] === Array.prototype[Symbol.iterator]",
+                                    "<eval>",
+                                    0,
+                                    null));
+
+                    assertEquals(
+                            123,
+                            cx.evaluateString(
+                                    scope,
+                                    "(function(){for(x of foo) { return x; }})();",
+                                    "<eval>",
+                                    0,
+                                    null));
+
+                    return null;
+                });
     }
 
-    //Explicitly not a ScriptableObject
+    // Explicitly not a ScriptableObject
     public static class FooBoilerplate implements Scriptable {
 
         protected final Scriptable scope;
@@ -277,7 +278,6 @@ public class IterableTest extends TestCase {
         public boolean hasInstance(Scriptable instance) {
             throw new UnsupportedOperationException("Not supported yet.");
         }
-
     }
 
     public static class SymbolFooBoilerplate extends FooBoilerplate implements SymbolScriptable {
@@ -288,23 +288,30 @@ public class IterableTest extends TestCase {
 
         @Override
         public Object get(Symbol key, Scriptable start) {
-            throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+            throw new UnsupportedOperationException(
+                    "Not supported yet."); // To change body of generated methods, choose Tools |
+            // Templates.
         }
 
         @Override
         public boolean has(Symbol key, Scriptable start) {
-            throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+            throw new UnsupportedOperationException(
+                    "Not supported yet."); // To change body of generated methods, choose Tools |
+            // Templates.
         }
 
         @Override
         public void put(Symbol key, Scriptable start, Object value) {
-            throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+            throw new UnsupportedOperationException(
+                    "Not supported yet."); // To change body of generated methods, choose Tools |
+            // Templates.
         }
 
         @Override
         public void delete(Symbol key) {
-            throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+            throw new UnsupportedOperationException(
+                    "Not supported yet."); // To change body of generated methods, choose Tools |
+            // Templates.
         }
-
     }
 }

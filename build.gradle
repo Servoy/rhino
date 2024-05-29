@@ -105,7 +105,7 @@ test {
 task sunSpiderBenchmark(type: JavaExec) {
     classpath = sourceSets.jmh.runtimeClasspath
     mainClass = 'org.openjdk.jmh.Main'
-    args '-f', '1', '-bm', 'avgt', '-tu', 'us', 'SunSpider'
+    args '-f', '1', '-bm', 'avgt', 'SunSpider'
 }
 
 task v8Benchmark(type: JavaExec) {
@@ -177,7 +177,8 @@ task runtimeJar(type: Jar) {
             "Bundle-ManifestVersion": "2",
             "Bundle-SymbolicName": "org.mozilla.rhino-runtime",
             "Bundle-Version": project.version.replaceAll("-.*", ""),
-            "Export-Package": "org.mozilla.javascript,org.mozilla.javascript.ast,org.mozilla.javascript.annotations"
+            "Export-Package": "org.mozilla.javascript,org.mozilla.javascript.ast,org.mozilla.javascript.annotations",
+            "Import-Package": "javax.lang.model,javax.script"
         )
     }
 }
@@ -230,7 +231,8 @@ jar {
             "Bundle-ManifestVersion": "2",
             "Bundle-SymbolicName": "org.mozilla.rhino",
             "Bundle-Version": project.version.replaceAll("-.*", ""),
-            "Export-Package": "org.mozilla.javascript,org.mozilla.javascript.ast,org.mozilla.javascript.annotations"
+            "Export-Package": "org.mozilla.javascript,org.mozilla.javascript.ast,org.mozilla.javascript.annotations",
+            "Import-Package": "javax.lang.model,javax.script"
         )
     }
 }
@@ -440,7 +442,6 @@ spotbugs {
 }
 
 spotless {
-    ratchetFrom 'code-formatting-required'
     java {
         googleJavaFormat().aosp()
     }

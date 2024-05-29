@@ -6,6 +6,7 @@
  * Tests for the Object.getOwnPropertyDescriptor(obj, prop) method
  */
 package org.mozilla.javascript.tests.es5;
+
 import static org.junit.Assert.assertEquals;
 
 import org.junit.After;
@@ -32,24 +33,30 @@ public class ObjectIsPrototypeOfTest {
     }
 
     @Test
-    public void testIsPrototypeOfUndefined() {
-        Object result = cx.evaluateString(
-                scope, "try { "
-                        + "  Object.prototype.isPrototypeOf.call(undefined, []);"
-                        + "} catch (e) { e.message }",
-                "test", 1, null
-        );
+    public void isPrototypeOfUndefined() {
+        Object result =
+                cx.evaluateString(
+                        scope,
+                        "try { "
+                                + "  Object.prototype.isPrototypeOf.call(undefined, []);"
+                                + "} catch (e) { e.message }",
+                        "test",
+                        1,
+                        null);
         assertEquals("Cannot convert undefined to an object.", result);
     }
 
     @Test
-    public void testIsPrototypeOfNull() {
-        Object result = cx.evaluateString(
-                scope, "try { "
-                        + "  Object.prototype.isPrototypeOf.call(null, []);"
-                        + "} catch (e) { e.message }",
-                "test", 1, null
-        );
+    public void isPrototypeOfNull() {
+        Object result =
+                cx.evaluateString(
+                        scope,
+                        "try { "
+                                + "  Object.prototype.isPrototypeOf.call(null, []);"
+                                + "} catch (e) { e.message }",
+                        "test",
+                        1,
+                        null);
         assertEquals("Cannot convert null to an object.", result);
     }
 }

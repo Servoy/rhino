@@ -10,20 +10,18 @@ import java.io.Serializable;
 import java.util.ArrayDeque;
 
 /**
- * <p>This class represents a string composed of two components, each of which
- * may be a <code>java.lang.String</code> or another ConsString.</p>
+ * This class represents a string composed of two components, each of which may be a <code>
+ * java.lang.String</code> or another ConsString.
  *
- * <p>This string representation is optimized for concatenation using the "+"
- * operator. Instead of immediately copying both components to a new character
- * array, ConsString keeps references to the original components and only
- * converts them to a String if either toString() is called or a certain depth
- * level is reached.</p>
+ * <p>This string representation is optimized for concatenation using the "+" operator. Instead of
+ * immediately copying both components to a new character array, ConsString keeps references to the
+ * original components and only converts them to a String if either toString() is called or a
+ * certain depth level is reached.
  *
- * <p>Note that instances of this class are only immutable if both parts are
- * immutable, i.e. either Strings or ConsStrings that are ultimately composed
- * of Strings.</p>
+ * <p>Note that instances of this class are only immutable if both parts are immutable, i.e. either
+ * Strings or ConsStrings that are ultimately composed of Strings.
  *
- * <p>Both the name and the concept are borrowed from V8.</p>
+ * <p>Both the name and the concept are borrowed from V8.
  */
 public class ConsString implements CharSequence, Serializable, Wrapper {
 
@@ -50,10 +48,10 @@ public class ConsString implements CharSequence, Serializable, Wrapper {
     private Object writeReplace() {
         return this.toString();
     }
-    
+
     @Override
     public String toString() {
-        return isFlat ? (String)left : flatten();
+        return isFlat ? (String) left : flatten();
     }
 
     private synchronized String flatten() {
@@ -61,7 +59,7 @@ public class ConsString implements CharSequence, Serializable, Wrapper {
             final char[] chars = new char[length];
             int charPos = length;
 
-            ArrayDeque<CharSequence> stack = new ArrayDeque<CharSequence>();
+            ArrayDeque<CharSequence> stack = new ArrayDeque<>();
             stack.addFirst(left);
 
             CharSequence next = right;
@@ -87,7 +85,7 @@ public class ConsString implements CharSequence, Serializable, Wrapper {
             right = "";
             isFlat = true;
         }
-        return (String)left;
+        return (String) left;
     }
 
     @Override
@@ -97,13 +95,13 @@ public class ConsString implements CharSequence, Serializable, Wrapper {
 
     @Override
     public char charAt(int index) {
-        String str = isFlat ? (String)left : flatten();
+        String str = isFlat ? (String) left : flatten();
         return str.charAt(index);
     }
 
     @Override
     public CharSequence subSequence(int start, int end) {
-        String str = isFlat ? (String)left : flatten();
+        String str = isFlat ? (String) left : flatten();
         return str.substring(start, end);
     }
     

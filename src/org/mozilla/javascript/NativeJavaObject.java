@@ -17,6 +17,7 @@ import java.math.BigInteger;
 import java.util.Date;
 import java.util.Iterator;
 import java.util.Map;
+import java.util.Objects;
 
 /**
  * This class reflects non-Array Java objects into the JavaScript environment. It reflect fields
@@ -1002,7 +1003,8 @@ public class NativeJavaObject implements Scriptable, SymbolScriptable, Wrapper, 
             if (!iterator.hasNext()) {
                 return Undefined.instance;
             }
-            return iterator.next();
+            Object obj = iterator.next();
+            return cx.getWrapFactory().wrap(cx, this, obj, obj == null ? null : obj.getClass());
         }
 
         @Override
@@ -1049,5 +1051,17 @@ public class NativeJavaObject implements Scriptable, SymbolScriptable, Wrapper, 
                 adapter_readAdapterObject = null;
             }
         }
+    }
+
+    @Override
+    public boolean equals(Object obj) {
+        return obj != null
+                && obj.getClass().equals(getClass())
+                && Objects.equals(((NativeJavaObject) obj).javaObject, javaObject);
+    }
+
+    @Override
+    public int hashCode() {
+        return javaObject == null ? 0 : javaObject.hashCode();
     }
 }

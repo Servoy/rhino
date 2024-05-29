@@ -7,7 +7,8 @@ import org.mozilla.javascript.Context;
 import org.mozilla.javascript.tests.Utils;
 
 /**
- * @see <a href="https://github.com/mozilla/rhino/issues/651">https://github.com/mozilla/rhino/issues/651</a>
+ * @see <a
+ *     href="https://github.com/mozilla/rhino/issues/651">https://github.com/mozilla/rhino/issues/651</a>
  */
 public class StrictTest {
     private Context cx;
@@ -25,28 +26,36 @@ public class StrictTest {
     }
 
     @Test
-    public void testFunctionCtor() {
-        Utils.runWithAllOptimizationLevels(ctx -> {
-            cx.evaluateString(cx.initSafeStandardObjects(),
-                    "(function() {"
-                            + "'use strict';"
-                            + "Function('with(this) {  }')();"
-                            + "})()",
-              "test.js", 1, null);
-            return null;
-        });
+    public void functionCtor() {
+        Utils.runWithAllOptimizationLevels(
+                ctx -> {
+                    cx.evaluateString(
+                            cx.initSafeStandardObjects(),
+                            "(function() {"
+                                    + "'use strict';"
+                                    + "Function('with(this) {  }')();"
+                                    + "})()",
+                            "test.js",
+                            1,
+                            null);
+                    return null;
+                });
     }
 
     @Test
-    public void testNewFunction() {
-        Utils.runWithAllOptimizationLevels(ctx -> {
-            cx.evaluateString(cx.initSafeStandardObjects(),
-                    "(function() {"
-                            + "'use strict';"
-                            + "new Function('with(this) {  }')();"
-                            + "})()",
-              "test.js", 1, null);
-            return null;
-        });
+    public void newFunction() {
+        Utils.runWithAllOptimizationLevels(
+                ctx -> {
+                    cx.evaluateString(
+                            cx.initSafeStandardObjects(),
+                            "(function() {"
+                                    + "'use strict';"
+                                    + "new Function('with(this) {  }')();"
+                                    + "})()",
+                            "test.js",
+                            1,
+                            null);
+                    return null;
+                });
     }
 }

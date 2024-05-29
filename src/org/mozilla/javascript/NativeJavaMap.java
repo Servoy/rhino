@@ -142,6 +142,16 @@ public class NativeJavaMap extends NativeJavaObject {
         return super.getIds();
     }
 
+    @Override
+    public boolean equals(Object obj) {
+        return super.equals(obj);
+    }
+
+    @Override
+    public int hashCode() {
+        return super.hashCode();
+    }
+
     private static Callable symbol_iterator =
             (Context cx, Scriptable scope, Scriptable thisObj, Object[] args) -> {
                 if (!(thisObj instanceof NativeJavaMap)) {
@@ -183,8 +193,14 @@ public class NativeJavaMap extends NativeJavaObject {
             if (!iterator.hasNext()) {
                 return cx.newArray(scope, new Object[] {Undefined.instance, Undefined.instance});
             }
-            Map.Entry e = iterator.next();
-            return cx.newArray(scope, new Object[] {e.getKey(), e.getValue()});
+            Map.Entry<Object, Object> e = iterator.next();
+            Object key = e.getKey();
+            Object value = e.getValue();
+            WrapFactory wrapFactory = cx.getWrapFactory();
+            key = wrapFactory.wrap(cx, this, key, key == null ? null : key.getClass());
+            value = wrapFactory.wrap(cx, this, value, value == null ? null : value.getClass());
+
+            return cx.newArray(scope, new Object[] {key, value});
         }
 
         @Override

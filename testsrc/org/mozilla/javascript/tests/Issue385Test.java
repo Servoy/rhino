@@ -12,11 +12,10 @@ import org.mozilla.javascript.EvaluatorException;
 import org.mozilla.javascript.Scriptable;
 
 /**
- * Expect parsing errors when encountering default values
- * inside destructuring assignments, instead of failing on some
- * later stage (e.g. in the IRFactory).
+ * Expect parsing errors when encountering default values inside destructuring assignments, instead
+ * of failing on some later stage (e.g. in the IRFactory).
  *
- * Should be removed when support for default values is added
+ * <p>Should be removed when support for default values is added
  */
 public class Issue385Test {
     private Context cx;
@@ -39,12 +38,12 @@ public class Issue385Test {
     }
 
     @Test(expected = EvaluatorException.class)
-    public void test_obj_destruct_simple() {
+    public void objDestructSimple() {
         cx.evaluateString(scope, "var {a: a = 10} = {}", "<eval>", 1, null);
     }
 
     @Test(expected = EvaluatorException.class)
-    public void test_obj_destruct_simple_short() {
+    public void objDestructSimpleShort() {
         // this case can pass for the wrong reason
         //
         // we assume that since 'a' isn't followed by ',', ':', or '}'
@@ -57,17 +56,17 @@ public class Issue385Test {
     }
 
     @Test(expected = EvaluatorException.class)
-    public void test_obj_destruct_complex() {
+    public void objDestructComplex() {
         cx.evaluateString(scope, "var {a: {b} = {b: 10}} = {}", "<eval>", 1, null);
     }
 
     @Test(expected = EvaluatorException.class)
-    public void test_arr_destruct_simple() {
+    public void arrDestructSimple() {
         cx.evaluateString(scope, "var [a = 10] = []", "<eval>", 1, null);
     }
 
     @Test(expected = EvaluatorException.class)
-    public void test_arr_destruct_complex() {
+    public void arrDestructComplex() {
         cx.evaluateString(scope, "var [[a = [b] = [4]] = [2]] = []", "<eval>", 1, null);
     }
 }

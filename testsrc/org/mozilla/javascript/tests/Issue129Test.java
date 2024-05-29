@@ -8,7 +8,6 @@ import static org.junit.Assert.assertNotNull;
 
 import java.util.ArrayList;
 import java.util.List;
-
 import org.junit.Before;
 import org.junit.Test;
 import org.mozilla.javascript.Parser;
@@ -18,9 +17,7 @@ import org.mozilla.javascript.ast.AstRoot;
 import org.mozilla.javascript.ast.NodeVisitor;
 import org.mozilla.javascript.ast.ParenthesizedExpression;
 
-/**
- * Tests position of ParenthesizedExpression node in  source code in different cases.
- */
+/** Tests position of ParenthesizedExpression node in source code in different cases. */
 public class Issue129Test {
     private static final String SOURCE_URI = "issue129test.js";
 
@@ -32,7 +29,7 @@ public class Issue129Test {
     }
 
     @Test
-    public void testGetPosition() {
+    public void getPosition() {
         String script = "(a);";
         AstRoot root = parser.parse(script, SOURCE_URI, 0);
         ParenthesizedExprVisitor visitor = new ParenthesizedExprVisitor();
@@ -44,7 +41,7 @@ public class Issue129Test {
     }
 
     @Test
-    public void testGetLength() {
+    public void getLength() {
         String script = "(a);";
         AstRoot root = parser.parse(script, SOURCE_URI, 0);
         ParenthesizedExprVisitor visitor = new ParenthesizedExprVisitor();
@@ -56,7 +53,7 @@ public class Issue129Test {
     }
 
     @Test
-    public void testGetAbsolutePosition() {
+    public void getAbsolutePosition() {
         String script = "var a = (b).c()";
         AstRoot root = parser.parse(script, SOURCE_URI, 0);
         ParenthesizedExprVisitor visitor = new ParenthesizedExprVisitor();
@@ -68,11 +65,8 @@ public class Issue129Test {
     }
 
     @Test
-    public void testMultiline() {
-        String script = "var a =\n" +
-            "b +\n" +
-            "(c +\n" +
-            "d);";
+    public void multiline() {
+        String script = "var a =\n" + "b +\n" + "(c +\n" + "d);";
         AstRoot root = parser.parse(script, SOURCE_URI, 0);
         ParenthesizedExprVisitor visitor = new ParenthesizedExprVisitor();
         root.visitAll(visitor);
@@ -83,7 +77,7 @@ public class Issue129Test {
     }
 
     @Test
-    public void testNested() {
+    public void nested() {
         String script = "var a = (b * (c + d));";
         AstRoot root = parser.parse(script, SOURCE_URI, 0);
         ParenthesizedExprVisitor visitor = new ParenthesizedExprVisitor();
@@ -94,24 +88,24 @@ public class Issue129Test {
         for (ParenthesizedExpression pe : exprs) {
             if (pe.getExpression().getType() == Token.MUL)
                 assertEquals("(b * (c + d))", getFromSource(script, pe));
-            else
-                assertEquals("(c + d)", getFromSource(script, pe));
+            else assertEquals("(c + d)", getFromSource(script, pe));
         }
     }
 
-    private String getFromSource(String source, AstNode node) {
-        return source.substring(node.getAbsolutePosition(), node.getAbsolutePosition() + node.getLength());
+    private static String getFromSource(String source, AstNode node) {
+        return source.substring(
+                node.getAbsolutePosition(), node.getAbsolutePosition() + node.getLength());
     }
 
-    /**
-     * Visitor stores all visited ParenthesizedExpression nodes.
-     */
+    /** Visitor stores all visited ParenthesizedExpression nodes. */
     private static class ParenthesizedExprVisitor implements NodeVisitor {
         private List<ParenthesizedExpression> expressions = new ArrayList<>();
 
         /**
          * Gets first encountered ParenthesizedExpression node.
-         * @return  First found ParenthesizedExpression node or {@code null} if no nodes of this type were found
+         *
+         * @return First found ParenthesizedExpression node or {@code null} if no nodes of this type
+         *     were found
          */
         public ParenthesizedExpression getFirstExpression() {
             return expressions.isEmpty() ? null : expressions.get(0);
@@ -119,7 +113,8 @@ public class Issue129Test {
 
         /**
          * Gets all found ParenthesizedExpression nodes.
-         * @return  Found nodes
+         *
+         * @return Found nodes
          */
         public List<ParenthesizedExpression> getExpressions() {
             return expressions;
@@ -127,7 +122,8 @@ public class Issue129Test {
 
         @Override
         public boolean visit(AstNode node) {
-            if (node instanceof ParenthesizedExpression) expressions.add((ParenthesizedExpression) node);
+            if (node instanceof ParenthesizedExpression)
+                expressions.add((ParenthesizedExpression) node);
             return true;
         }
     }

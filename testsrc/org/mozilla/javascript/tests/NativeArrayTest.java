@@ -4,12 +4,13 @@
 
 package org.mozilla.javascript.tests;
 
-import static org.hamcrest.core.Is.is;
-import static org.junit.Assert.assertThat;
+import static org.junit.Assert.assertArrayEquals;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
 
 import java.util.ArrayList;
 import java.util.Arrays;
-
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
@@ -18,126 +19,123 @@ import org.mozilla.javascript.NativeArray;
 import org.mozilla.javascript.Scriptable;
 
 public class NativeArrayTest {
-  private NativeArray array;
+    private NativeArray array;
 
-  @Before
-  public void init() {
-    array = new NativeArray(1);
-  }
+    @Before
+    public void init() {
+        array = new NativeArray(1);
+    }
 
-  @Test
-  public void getIdsShouldIncludeBothIndexAndNormalProperties() {
-    array.put(0, array, "index");
-    array.put("a", array, "normal");
+    @Test
+    public void getIdsShouldIncludeBothIndexAndNormalProperties() {
+        array.put(0, array, "index");
+        array.put("a", array, "normal");
 
-    assertThat(array.getIds(), is(new Object[]{0, "a"}));
-  }
+        assertArrayEquals(new Object[] {0, "a"}, array.getIds());
+    }
 
-  @Test
-  public void deleteShouldRemoveIndexProperties() {
-    array.put(0, array, "a");
-    array.delete(0);
-    assertThat(array.has(0, array), is(false));
-  }
+    @Test
+    public void deleteShouldRemoveIndexProperties() {
+        array.put(0, array, "a");
+        array.delete(0);
+        assertFalse(array.has(0, array));
+    }
 
-  @Test
-  public void deleteShouldRemoveNormalProperties() {
-    array.put("p", array, "a");
-    array.delete("p");
-    assertThat(array.has("p", array), is(false));
-  }
+    @Test
+    public void deleteShouldRemoveNormalProperties() {
+        array.put("p", array, "a");
+        array.delete("p");
+        assertFalse(array.has("p", array));
+    }
 
-  @Test
-  public void putShouldAddIndexProperties() {
-    array.put(0, array, "a");
-    assertThat(array.has(0, array), is(true));
-  }
+    @Test
+    public void putShouldAddIndexProperties() {
+        array.put(0, array, "a");
+        assertTrue(array.has(0, array));
+    }
 
-  @Test
-  public void putShouldAddNormalProperties() {
-    array.put("p", array, "a");
-    assertThat(array.has("p", array), is(true));
-  }
+    @Test
+    public void putShouldAddNormalProperties() {
+        array.put("p", array, "a");
+        assertTrue(array.has("p", array));
+    }
 
-  @Test
-  public void getShouldReturnIndexProperties() {
-    array.put(0, array, "a");
-    array.put("p", array, "b");
-    assertThat((String) array.get(0, array), is("a"));
-  }
+    @Test
+    public void getShouldReturnIndexProperties() {
+        array.put(0, array, "a");
+        array.put("p", array, "b");
+        assertEquals("a", array.get(0, array));
+    }
 
-  @Test
-  public void getShouldReturnNormalProperties() {
-    array.put("p", array, "a");
-    assertThat((String) array.get("p", array), is("a"));
-  }
+    @Test
+    public void getShouldReturnNormalProperties() {
+        array.put("p", array, "a");
+        assertEquals("a", array.get("p", array));
+    }
 
-  @Test
-  public void hasShouldBeFalseForANewArray() {
-    assertThat(new NativeArray(0).has(0, array), is(false));
-  }
+    @Test
+    public void hasShouldBeFalseForANewArray() {
+        assertFalse(new NativeArray(0).has(0, array));
+    }
 
-  @Test
-  public void getIndexIdsShouldBeEmptyForEmptyArray() {
-    assertThat(new NativeArray(0).getIndexIds(), is(new ArrayList<Integer>()));
-  }
+    @Test
+    public void getIndexIdsShouldBeEmptyForEmptyArray() {
+        assertEquals(new ArrayList<Integer>(), new NativeArray(0).getIndexIds());
+    }
 
-  @Test
-  public void getIndexIdsShouldBeAZeroForSimpleSingletonArray() {
-    array.put(0, array, "a");
-    assertThat(array.getIndexIds(), is(Arrays.asList(0)));
-  }
+    @Test
+    public void getIndexIdsShouldBeAZeroForSimpleSingletonArray() {
+        array.put(0, array, "a");
+        assertEquals(Arrays.asList(0), array.getIndexIds());
+    }
 
-  @Test
-  public void getIndexIdsShouldWorkWhenIndicesSetAsString() {
-    array.put("0", array, "a");
-    assertThat(array.getIndexIds(), is(Arrays.asList(0)));
-  }
+    @Test
+    public void getIndexIdsShouldWorkWhenIndicesSetAsString() {
+        array.put("0", array, "a");
+        assertEquals(Arrays.asList(0), array.getIndexIds());
+    }
 
-  @Test
-  public void getIndexIdsShouldNotIncludeNegativeIds() {
-    array.put(-1, array, "a");
-    assertThat(array.getIndexIds(), is(new ArrayList<Integer>()));
-  }
+    @Test
+    public void getIndexIdsShouldNotIncludeNegativeIds() {
+        array.put(-1, array, "a");
+        assertEquals(new ArrayList<Integer>(), array.getIndexIds());
+    }
 
-  @Test
-  public void getIndexIdsShouldIncludeIdsLessThan2ToThe32() {
-    int maxIndex = (int) (1L << 31) - 1;
-    array.put(maxIndex, array, "a");
-    assertThat(array.getIndexIds(), is(Arrays.asList(maxIndex)));
-  }
+    @Test
+    public void getIndexIdsShouldIncludeIdsLessThan2ToThe32() {
+        int maxIndex = (int) (1L << 31) - 1;
+        array.put(maxIndex, array, "a");
+        assertEquals(Arrays.asList(maxIndex), array.getIndexIds());
+    }
 
-  @Test
-  public void getIndexIdsShouldNotIncludeIdsGreaterThanOrEqualTo2ToThe32() {
-    array.put((1L<<31)+"", array, "a");
-    assertThat(array.getIndexIds(), is(new ArrayList<Integer>()));
-  }
+    @Test
+    public void getIndexIdsShouldNotIncludeIdsGreaterThanOrEqualTo2ToThe32() {
+        array.put((1L << 31) + "", array, "a");
+        assertEquals(new ArrayList<Integer>(), array.getIndexIds());
+    }
 
-  @Test
-  public void getIndexIdsShouldNotReturnNonNumericIds() {
-    array.put("x", array, "a");
-    assertThat(array.getIndexIds(), is(new ArrayList<Integer>()));
-  }
+    @Test
+    public void getIndexIdsShouldNotReturnNonNumericIds() {
+        array.put("x", array, "a");
+        assertEquals(new ArrayList<Integer>(), array.getIndexIds());
+    }
 
-  @Test
-  public void testToString() {
-      String source =
-          "var f = function() {\n"
-          + "  var obj = [0,1];\n"
-          + "  var a = obj.map(function() {return obj;});\n"
-          + "  return a.toString();\n"
-          + "};\n"
-          + "f();";
+    @Test
+    public void testToString() {
+        String source =
+                "var f = function() {\n"
+                        + "  var obj = [0,1];\n"
+                        + "  var a = obj.map(function() {return obj;});\n"
+                        + "  return a.toString();\n"
+                        + "};\n"
+                        + "f();";
 
-      Context cx = Context.enter();
-      try {
-          cx.setLanguageVersion(Context.VERSION_ES6);
+        try (Context cx = Context.enter()) {
+            cx.setLanguageVersion(Context.VERSION_ES6);
 
-          Scriptable scope = cx.initStandardObjects();
-          String result = cx.evaluateString(scope, source, "source", 1, null).toString();
-          Assert.assertEquals("0,1,0,1", result);
-      } finally {
-          Context.exit();
-      }
-  }
+            Scriptable scope = cx.initStandardObjects();
+            String result = cx.evaluateString(scope, source, "source", 1, null).toString();
+            Assert.assertEquals("0,1,0,1", result);
+        }
+    }
 }

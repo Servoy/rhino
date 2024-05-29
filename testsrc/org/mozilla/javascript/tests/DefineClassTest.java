@@ -23,15 +23,16 @@ public class DefineClassTest {
     Scriptable scope;
 
     @Test
-    public void testAnnotatedHostObject() {
-        Context cx = Context.enter();
-        try {
+    public void annotatedHostObject() {
+        try (Context cx = Context.enter()) {
             Object result = evaluate(cx, "a = new AnnotatedHostObject(); a.initialized;");
             assertEquals(result, Boolean.TRUE);
             assertEquals(evaluate(cx, "a.instanceFunction();"), "instanceFunction");
             assertEquals(evaluate(cx, "a.namedFunction();"), "namedFunction");
             assertEquals(evaluate(cx, "AnnotatedHostObject.staticFunction();"), "staticFunction");
-            assertEquals(evaluate(cx, "AnnotatedHostObject.namedStaticFunction();"), "namedStaticFunction");
+            assertEquals(
+                    evaluate(cx, "AnnotatedHostObject.namedStaticFunction();"),
+                    "namedStaticFunction");
             assertNull(evaluate(cx, "a.foo;"));
             assertEquals(evaluate(cx, "a.foo = 'foo'; a.foo;"), "FOO");
             assertEquals(evaluate(cx, "a.bar;"), "bar");
@@ -40,15 +41,12 @@ public class DefineClassTest {
             // ignored in non-strict mode.
             evaluate(cx, "a.bar = 'new bar'");
             assertEquals("bar", evaluate(cx, "a.bar;"));
-        } finally {
-            Context.exit();
         }
     }
 
     @Test
-    public void testTraditionalHostObject() {
-        Context cx = Context.enter();
-        try {
+    public void traditionalHostObject() {
+        try (Context cx = Context.enter()) {
             Object result = evaluate(cx, "t = new TraditionalHostObject(); t.initialized;");
             assertEquals(result, Boolean.TRUE);
             assertEquals(evaluate(cx, "t.instanceFunction();"), "instanceFunction");
@@ -61,8 +59,6 @@ public class DefineClassTest {
             // ignored in non-strict mode.
             evaluate(cx, "t.bar = 'new bar'");
             assertEquals("bar", evaluate(cx, "t.bar;"));
-        } finally {
-            Context.exit();
         }
     }
 
@@ -70,16 +66,12 @@ public class DefineClassTest {
         return cx.evaluateString(scope, str, "<testsrc>", 0, null);
     }
 
-
     @Before
     public void init() throws Exception {
-        Context cx = Context.enter();
-        try {
+        try (Context cx = Context.enter()) {
             scope = cx.initStandardObjects();
             ScriptableObject.defineClass(scope, AnnotatedHostObject.class);
             ScriptableObject.defineClass(scope, TraditionalHostObject.class);
-        } finally {
-            Context.exit();
         }
     }
 
@@ -166,8 +158,8 @@ public class DefineClassTest {
             return foo;
         }
 
-        public void jsSet_foo(String foo) {
-            this.foo = foo.toUpperCase();
+        public void jsSet_foo(String fooStr) {
+            foo = fooStr.toUpperCase();
         }
 
         public String jsGet_bar() {
@@ -178,7 +170,5 @@ public class DefineClassTest {
         public void setBar(String bar) {
             this.bar = bar.toUpperCase();
         }
-
     }
-
 }

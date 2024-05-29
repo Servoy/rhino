@@ -22,57 +22,54 @@ public class MemberBoxCallTest {
     Scriptable scope;
 
     @Test
-    public void testPrototypeProperty() {
-        Context cx = Context.enter();
-        try {
-            assertEquals("SUPERVAL",
-                evaluate(cx, 
-                    "var hostObj = new AnnotatedHostObject(); " +
-                    "var valueProperty = Object.getOwnPropertyDescriptor(Object.getPrototypeOf(hostObj), \"foo\");" +
-                    "var result = 'failed';" +
-                    "if( valueProperty.get && valueProperty.set ) {" +
-                        "valueProperty.set.call(hostObj, 'superVal');" +
-                        "result = valueProperty.get.call(hostObj);" +
-                    "}" +
-                    "result;"));
-        } finally {
-            Context.exit();
+    public void prototypeProperty() {
+        try (Context cx = Context.enter()) {
+            assertEquals(
+                    "SUPERVAL",
+                    evaluate(
+                            cx,
+                            "var hostObj = new AnnotatedHostObject(); "
+                                    + "var valueProperty = Object.getOwnPropertyDescriptor(Object.getPrototypeOf(hostObj), \"foo\");"
+                                    + "var result = 'failed';"
+                                    + "if( valueProperty.get && valueProperty.set ) {"
+                                    + "valueProperty.set.call(hostObj, 'superVal');"
+                                    + "result = valueProperty.get.call(hostObj);"
+                                    + "}"
+                                    + "result;"));
         }
     }
 
     @Test
-    public void testPropertyGetterName() {
-        Context cx = Context.enter();
-        try {
-            assertEquals("foo",
-                evaluate(cx, 
-                    "var hostObj = new AnnotatedHostObject(); " +
-                    "var valueProperty = Object.getOwnPropertyDescriptor(Object.getPrototypeOf(hostObj), \"foo\");" +
-                    "var result = 'failed';" +
-                    "if( valueProperty.get && valueProperty.set ) {" +
-                        "result = '' + valueProperty.get.name;" +
-                    "}" +
-                    "result;"));
-        } finally {
-            Context.exit();
+    public void propertyGetterName() {
+        try (Context cx = Context.enter()) {
+            assertEquals(
+                    "foo",
+                    evaluate(
+                            cx,
+                            "var hostObj = new AnnotatedHostObject(); "
+                                    + "var valueProperty = Object.getOwnPropertyDescriptor(Object.getPrototypeOf(hostObj), \"foo\");"
+                                    + "var result = 'failed';"
+                                    + "if( valueProperty.get && valueProperty.set ) {"
+                                    + "result = '' + valueProperty.get.name;"
+                                    + "}"
+                                    + "result;"));
         }
     }
 
     @Test
-    public void testPropertySetterName() {
-        Context cx = Context.enter();
-        try {
-            assertEquals("foo",
-                evaluate(cx, 
-                    "var hostObj = new AnnotatedHostObject(); " +
-                    "var valueProperty = Object.getOwnPropertyDescriptor(Object.getPrototypeOf(hostObj), \"foo\");" +
-                    "var result = 'failed';" +
-                    "if( valueProperty.get && valueProperty.set ) {" +
-                        "result = '' + valueProperty.set.name;" +
-                    "}" +
-                    "result;"));
-        } finally {
-            Context.exit();
+    public void propertySetterName() {
+        try (Context cx = Context.enter()) {
+            assertEquals(
+                    "foo",
+                    evaluate(
+                            cx,
+                            "var hostObj = new AnnotatedHostObject(); "
+                                    + "var valueProperty = Object.getOwnPropertyDescriptor(Object.getPrototypeOf(hostObj), \"foo\");"
+                                    + "var result = 'failed';"
+                                    + "if( valueProperty.get && valueProperty.set ) {"
+                                    + "result = '' + valueProperty.set.name;"
+                                    + "}"
+                                    + "result;"));
         }
     }
 
@@ -80,15 +77,11 @@ public class MemberBoxCallTest {
         return cx.evaluateString(scope, str, "<testsrc>", 0, null);
     }
 
-
     @Before
     public void init() throws Exception {
-        Context cx = Context.enter();
-        try {
+        try (Context cx = Context.enter()) {
             scope = cx.initStandardObjects();
             ScriptableObject.defineClass(scope, AnnotatedHostObject.class);
-        } finally {
-            Context.exit();
         }
     }
 

@@ -38,6 +38,7 @@ import org.mozilla.javascript.ErrorReporter;
 import org.mozilla.javascript.Function;
 import org.mozilla.javascript.ImporterTopLevel;
 import org.mozilla.javascript.NativeArray;
+import org.mozilla.javascript.NativeConsole;
 import org.mozilla.javascript.RhinoException;
 import org.mozilla.javascript.Script;
 import org.mozilla.javascript.ScriptRuntime;
@@ -105,6 +106,7 @@ public class Global extends ImporterTopLevel {
         // Define some global functions particular to the shell. Note
         // that these functions are not part of ECMA.
         initStandardObjects(cx, sealedStdLib);
+        NativeConsole.init(this, sealedStdLib, new ShellConsolePrinter());
         String[] names = {
             "defineClass",
             "deserialize",
@@ -300,12 +302,13 @@ public class Global extends ImporterTopLevel {
      * @exception InstantiationException if unable to instantiate the named class
      */
     public static void loadClass(Context cx, Scriptable thisObj, Object[] args, Function funObj)
-            throws IllegalAccessException, InstantiationException {
+            throws IllegalAccessException, InstantiationException, NoSuchMethodException,
+                    InvocationTargetException {
         Class<?> clazz = getClass(args);
         if (!Script.class.isAssignableFrom(clazz)) {
             throw reportRuntimeError("msg.must.implement.Script");
         }
-        Script script = (Script) clazz.newInstance();
+        Script script = (Script) clazz.getDeclaredConstructor().newInstance();
         script.exec(cx, thisObj);
     }
 
@@ -337,9 +340,9 @@ public class Global extends ImporterTopLevel {
         String filename = Context.toString(args[1]);
         FileOutputStream fos = new FileOutputStream(filename);
         Scriptable scope = ScriptableObject.getTopLevelScope(thisObj);
-        ScriptableOutputStream out = new ScriptableOutputStream(fos, scope);
-        out.writeObject(obj);
-        out.close();
+        try (ScriptableOutputStream out = new ScriptableOutputStream(fos, scope)) {
+            out.writeObject(obj);
+        }
     }
 
     public static Object deserialize(Context cx, Scriptable thisObj, Object[] args, Function funObj)
@@ -348,12 +351,13 @@ public class Global extends ImporterTopLevel {
             throw Context.reportRuntimeError("Expected a filename to read the serialization from");
         }
         String filename = Context.toString(args[0]);
-        FileInputStream fis = new FileInputStream(filename);
-        Scriptable scope = ScriptableObject.getTopLevelScope(thisObj);
-        ObjectInputStream in = new ScriptableInputStream(fis, scope);
-        Object deserialized = in.readObject();
-        in.close();
-        return Context.toObject(deserialized, scope);
+        try (FileInputStream fis = new FileInputStream(filename)) {
+            Scriptable scope = ScriptableObject.getTopLevelScope(thisObj);
+            try (ObjectInputStream in = new ScriptableInputStream(fis, scope)) {
+                Object deserialized = in.readObject();
+                return Context.toObject(deserialized, scope);
+            }
+        }
     }
 
     public String[] getPrompts(Context cx) {
@@ -1030,14 +1034,12 @@ public class Global extends ImporterTopLevel {
                 is = new FileInputStream(f);
             }
 
-            Reader r;
-            if (charCoding == null) {
-                r = new InputStreamReader(is);
-            } else {
-                r = new InputStreamReader(is, charCoding);
+            try (Reader r =
+                    new InputStreamReader(
+                            is,
+                            charCoding == null ? Charset.defaultCharset().name() : charCoding)) {
+                return readReader(r, chunkLength);
             }
-            return readReader(r, chunkLength);
-
         } finally {
             if (is != null) is.close();
         }
@@ -1141,10 +1143,12 @@ class Runner implements Runnable, ContextAction<Object> {
         s = script;
     }
 
+    @Override
     public void run() {
         factory.call(this);
     }
 
+    @Override
     public Object run(Context cx) {
         if (f != null) return f.call(cx, scope, scope, args);
         else return s.exec(cx, scope);

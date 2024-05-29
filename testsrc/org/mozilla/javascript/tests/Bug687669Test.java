@@ -2,9 +2,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-/**
- * 
- */
+/** */
 package org.mozilla.javascript.tests;
 
 import static org.junit.Assert.assertEquals;
@@ -20,11 +18,9 @@ import org.mozilla.javascript.ScriptableObject;
 import org.mozilla.javascript.Undefined;
 import org.mozilla.javascript.ast.AstRoot;
 
-/**
- * @author André Bargull
- * 
- */
+/** @author André Bargull */
 public class Bug687669Test {
+
     private Context cx;
     private ScriptableObject scope;
 
@@ -57,7 +53,7 @@ public class Bug687669Test {
     }
 
     @Test
-    public void testEval() {
+    public void eval() {
         // test EmptyStatement node doesn't infer with return values (in
         // contrast to wrapping EmptyExpression into an ExpressionStatement)
         assertEquals(1d, eval("1;;;;"));
@@ -66,7 +62,7 @@ public class Bug687669Test {
     }
 
     @Test
-    public void testToSource() {
+    public void toSource() {
         assertEquals("L1:\n  ;\n", toSource("L1:;"));
         assertEquals("L1:\n  ;\na = 1;\n", toSource("L1:; a=1;"));
 
@@ -78,5 +74,4 @@ public class Bug687669Test {
 
         assertEquals("if (1) \n  ;\n;\n;\n;\n", toSource("if(1);;;;"));
     }
-
 }

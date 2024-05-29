@@ -4,6 +4,7 @@
 
 package org.mozilla.javascript.tests.json;
 
+import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 
 import org.junit.After;
@@ -34,7 +35,6 @@ public class JsonParserTest {
     public void shouldFailToParseIllegalWhitespaceChars() throws Exception {
         parser.parseValue(" \u000b 1");
     }
-
 
     @Test
     public void shouldParseJsonNull() throws Exception {
@@ -80,7 +80,8 @@ public class JsonParserTest {
     @Test
     public void shouldParseJsonString() throws Exception {
         assertEquals("hello", parser.parseValue("\"hello\""));
-        assertEquals("Sch\u00f6ne Gr\u00fc\u00dfe",
+        assertEquals(
+                "Sch\u00f6ne Gr\u00fc\u00dfe",
                 parser.parseValue("\"Sch\\u00f6ne Gr\\u00fc\\u00dfe\""));
         assertEquals("", parser.parseValue(str('"', '"')));
         assertEquals(" ", parser.parseValue(str('"', ' ', '"')));
@@ -115,14 +116,12 @@ public class JsonParserTest {
 
     @Test
     public void shouldParseEmptyJsonArray() throws Exception {
-        assertEquals(0, ((NativeArray) parser.parseValue("[]")).getLength() );
+        assertEquals(0, ((NativeArray) parser.parseValue("[]")).getLength());
     }
 
     @Test
-    @SuppressWarnings("unchecked")
     public void shouldParseHeterogeneousJsonArray() throws Exception {
-        NativeArray actual = (NativeArray) parser
-                .parseValue("[ \"hello\" , 3, null, [false] ]");
+        NativeArray actual = (NativeArray) parser.parseValue("[ \"hello\" , 3, null, [false] ]");
         assertEquals("hello", actual.get(0, actual));
         assertEquals(3, actual.get(1, actual));
         assertEquals(null, actual.get(2, actual));
@@ -139,19 +138,35 @@ public class JsonParserTest {
     }
 
     @Test
-    @SuppressWarnings({ "serial", "unchecked" })
     public void shouldParseJsonObject() throws Exception {
-        String json = "{" +
-                "\"bool\" : false, " +
-                "\"str\"  : \"xyz\", " +
-                "\"obj\"  : {\"a\":1} " +
-                "}";
-    NativeObject actual = (NativeObject) parser.parseValue(json);
-    assertEquals(false, actual.get("bool", actual));
-    assertEquals("xyz", actual.get("str", actual));
+        String json =
+                "{" + "\"bool\" : false, " + "\"str\"  : \"xyz\", " + "\"obj\"  : {\"a\":1} " + "}";
+        NativeObject actual = (NativeObject) parser.parseValue(json);
+        assertEquals(false, actual.get("bool", actual));
+        assertEquals("xyz", actual.get("str", actual));
+        assertArrayEquals(
+                "Property ordering should match",
+                new Object[] {"bool", "str", "obj"},
+                actual.getIds());
 
-    NativeObject innerObj = (NativeObject) actual.get("obj", actual);
-    assertEquals(1, innerObj.get("a", innerObj));
+        NativeObject innerObj = (NativeObject) actual.get("obj", actual);
+        assertEquals(1, innerObj.get("a", innerObj));
+    }
+
+    @Test
+    public void testECMAKeyOrdering() throws Exception {
+        try (Context cx = Context.enter()) {
+            cx.setLanguageVersion(Context.VERSION_ES6);
+            String json =
+                    "{\"foo\": \"a\", \"bar\": \"b\", \"1\": \"c\", \"-1\": \"d\", \"x\": \"e\"}";
+            NativeObject actual = (NativeObject) parser.parseValue(json);
+            // Ensure that modern ECMAScript property ordering works, which depends on
+            // valid index values being treated as numbers and not as strings.
+            assertArrayEquals(
+                    "Property ordering should match",
+                    new Object[] {1, "foo", "bar", "-1", "x"},
+                    actual.getIds());
+        }
     }
 
     @Test(expected = ParseException.class)
@@ -166,17 +181,17 @@ public class JsonParserTest {
 
     @Test(expected = ParseException.class)
     public void shouldFailToParseStringTruncatedUnicode() throws Exception {
-            parser.parseValue("\"\\u00f\"");
+        parser.parseValue("\"\\u00f\"");
     }
 
     @Test(expected = ParseException.class)
     public void shouldFailToParseStringControlChars1() throws Exception {
-            parser.parseValue("\"\u0000\"");
+        parser.parseValue("\"\u0000\"");
     }
 
     @Test(expected = ParseException.class)
     public void shouldFailToParseStringControlChars2() throws Exception {
-            parser.parseValue("\"\u001f\"");
+        parser.parseValue("\"\u001f\"");
     }
 
     @Test
@@ -258,4 +273,3 @@ public class JsonParserTest {
         return new String(chars);
     }
 }
-
