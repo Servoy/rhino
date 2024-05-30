@@ -3442,7 +3442,10 @@ public class ScriptRuntime {
      */
     public static boolean eq(Object x, Object y) {
     	// SPECIAL DATE HANDLING
-    	if (x instanceof Date) {
+    	if (x instanceof Date || x instanceof NativeDate) {
+    		if (x instanceof Wrapper) {
+    			x = ((Wrapper) x).unwrap();
+    		}
     		if (y instanceof Wrapper) {
     			y = ((Wrapper) y).unwrap();
     		}
@@ -3450,13 +3453,17 @@ public class ScriptRuntime {
     			return ((Date) x).getTime() == ((Date) y).getTime();
     		}
     		return false;
-    	} else if (y instanceof Date && x instanceof Wrapper) {
+    	} else if ((y instanceof Date || y instanceof NativeDate) && x instanceof Wrapper) {
+    		if (y instanceof Wrapper) {
+    			y = ((Wrapper) y).unwrap();
+    		}
     		x = ((Wrapper) x).unwrap();
     		if (x instanceof Date) {
     			return ((Date) x).getTime() == ((Date) y).getTime();
     		}
     		return false;
     	}
+    	// END Special date handling
         if (x == null || Undefined.isUndefined(x)) {
             if (y == null || Undefined.isUndefined(y)) {
                 return true;
