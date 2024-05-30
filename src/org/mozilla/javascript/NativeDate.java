@@ -40,6 +40,12 @@ public final class NativeDate extends IdScriptableObject implements Wrapper {
 	 * @see org.mozilla.javascript.Wrapper#unwrap()
 	 */
 	public Object unwrap() {
+		if (originalDate != null) {
+			// clone the orignal date so we don't change that, but we do keep the type of the date.
+			Date date = (Date) originalDate.clone();
+			date.setTime(convertFromUTCMillisToJava(this.date));
+			return date;
+		}
 		return new Date(convertFromUTCMillisToJava(this.date));
 	}
 
@@ -1438,6 +1444,7 @@ public final class NativeDate extends IdScriptableObject implements Wrapper {
     	double time;
 		if (args.length == 1 && args[0] instanceof Date) {
 			time = convertToUTCMillisFromJava(((Date) args[0]).getTime());
+			obj.originalDate = (Date) args[0];
 		} else {
 			time = date_msecFromArgs(args);
 			if (!Double.isNaN(time) && !Double.isInfinite(time)) time = TimeClip(internalUTC(time));
@@ -1978,4 +1985,8 @@ public final class NativeDate extends IdScriptableObject implements Wrapper {
     private static final DateFormat localeTimeFormatter = new SimpleDateFormat("h:mm:ss a z");
 
     private double date;
+    
+    // this is set when this date is created from a java Date (can be also timestamp)
+    private Date originalDate;
+    
 }
