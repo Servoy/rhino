@@ -144,6 +144,7 @@ public class DBGPDebugFrame implements DebugFrame {
 				value = value.substring("this.".length());
 				cs = thisObj;
 			}
+			else if (value.equals("this")) return thisObj;
 			Object evaluateString = context.evaluateString(cs, value, "eval",
 					0, null);
 			return evaluateString;
