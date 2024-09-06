@@ -103,7 +103,7 @@ import org.mozilla.javascript.ast.Yield;
  * @author Mike McCabe
  * @author Brendan Eich
  */
-public class Parser {
+public class Parser implements IParser{
     /** Maximum number of allowed function or constructor arguments, to follow SpiderMonkey. */
     public static final int ARGC_LIMIT = 1 << 16;
 
@@ -190,7 +190,7 @@ public class Parser {
         if (compilerEnv.isStrictMode()) addWarning(messageId, messageArg, position, length);
     }
 
-    void addWarning(String messageId, String messageArg) {
+    public void addWarning(String messageId, String messageArg) {
         int beg = -1, end = -1;
         if (ts != null) {
             beg = ts.tokenBeg;
@@ -216,7 +216,7 @@ public class Parser {
         }
     }
 
-    void addError(String messageId) {
+    public void addError(String messageId) {
         if (ts == null) {
             addError(messageId, 0, 0);
         } else {
@@ -236,7 +236,7 @@ public class Parser {
         }
     }
 
-    void addError(String messageId, int c) {
+    public void addError(String messageId, int c) {
         String messageArg = Character.toString((char) c);
         addError(messageId, messageArg);
     }
@@ -316,11 +316,11 @@ public class Parser {
                 : ScriptRuntime.getMessageById(messageId, messageArg);
     }
 
-    void reportError(String messageId) {
+    public void reportError(String messageId) {
         reportError(messageId, null);
     }
 
-    void reportError(String messageId, String messageArg) {
+    public void reportError(String messageId, String messageArg) {
         if (ts == null) { // happens in some regression tests
             reportError(messageId, messageArg, 1, 1);
         } else {
@@ -4308,4 +4308,14 @@ public class Parser {
     public boolean inUseStrictDirective() {
         return inUseStrictDirective;
     }
+
+	@Override
+	public boolean getCalledByCompileFunction() {
+		return calledByCompileFunction;
+	}
+
+	@Override
+	public CompilerEnvirons getCompilerEnv() {
+		return compilerEnv;
+	}
 }

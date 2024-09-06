@@ -19,7 +19,7 @@ import java.math.BigInteger;
  * @author Mike McCabe
  * @author Brendan Eich
  */
-class TokenStream {
+public class TokenStream {
     /*
      * For chars - because we need something out-of-range
      * to check.  (And checking EOF by exception is annoying.)
@@ -36,7 +36,7 @@ class TokenStream {
     private static final char BYTE_ORDER_MARK = '\uFEFF';
     private static final char NUMERIC_SEPARATOR = '_';
 
-    TokenStream(Parser parser, Reader sourceReader, String sourceString, int lineno) {
+    public TokenStream(IParser parser, Reader sourceReader, String sourceString, int lineno) {
         this.parser = parser;
         this.lineno = lineno;
         if (sourceReader != null) {
@@ -78,7 +78,7 @@ class TokenStream {
         return "";
     }
 
-    static boolean isKeyword(String s, int version, boolean isStrict) {
+    public static boolean isKeyword(String s, int version, boolean isStrict) {
         return Token.EOF != stringToKeyword(s, version, isStrict);
     }
 
@@ -595,19 +595,19 @@ class TokenStream {
         return true;
     }
 
-    final String getSourceString() {
+    public final String getSourceString() {
         return sourceString;
     }
 
-    final int getLineno() {
+    public final int getLineno() {
         return lineno;
     }
 
-    final String getString() {
+    public final String getString() {
         return string;
     }
 
-    final char getQuoteChar() {
+    public final char getQuoteChar() {
         return (char) quoteChar;
     }
 
@@ -619,27 +619,27 @@ class TokenStream {
         return bigInt;
     }
 
-    final boolean isNumericBinary() {
+    public final boolean isNumericBinary() {
         return isBinary;
     }
 
-    final boolean isNumericOldOctal() {
+    public final boolean isNumericOldOctal() {
         return isOldOctal;
     }
 
-    final boolean isNumericOctal() {
+    public final boolean isNumericOctal() {
         return isOctal;
     }
 
-    final boolean isNumericHex() {
+    public final boolean isNumericHex() {
         return isHex;
     }
 
-    final boolean eof() {
+    public final boolean eof() {
         return hitEOF;
     }
 
-    final int getToken() throws IOException {
+    public final int getToken() throws IOException {
         int c;
 
         for (; ; ) {
@@ -762,7 +762,7 @@ class TokenStream {
 
                 String str = getStringFromBuffer();
                 if (!containsEscape
-                        || parser.compilerEnv.getLanguageVersion() >= Context.VERSION_ES6) {
+                        || parser.getCompilerEnv().getLanguageVersion() >= Context.VERSION_ES6) {
                     // OPT we shouldn't have to make a string (object!) to
                     // check if it's a keyword.
 
@@ -770,11 +770,11 @@ class TokenStream {
                     int result =
                             stringToKeyword(
                                     str,
-                                    parser.compilerEnv.getLanguageVersion(),
+                                    parser.getCompilerEnv().getLanguageVersion(),
                                     parser.inUseStrictDirective());
                     if (result != Token.EOF) {
                         if ((result == Token.LET || result == Token.YIELD)
-                                && parser.compilerEnv.getLanguageVersion() < Context.VERSION_1_7) {
+                                && parser.getCompilerEnv().getLanguageVersion() < Context.VERSION_1_7) {
                             // LET and YIELD are tokens only in 1.7 and later
                             string = result == Token.LET ? "let" : "yield";
                             result = Token.NAME;
@@ -784,15 +784,15 @@ class TokenStream {
                         this.string = (String) allStrings.intern(str);
                         if (result != Token.RESERVED) {
                             return result;
-                        } else if (parser.compilerEnv.getLanguageVersion() >= Context.VERSION_ES6) {
+                        } else if (parser.getCompilerEnv().getLanguageVersion() >= Context.VERSION_ES6) {
                             return result;
-                        } else if (!parser.compilerEnv.isReservedKeywordAsIdentifier()) {
+                        } else if (!parser.getCompilerEnv().isReservedKeywordAsIdentifier()) {
                             return result;
                         }
                     }
                 } else if (isKeyword(
                         str,
-                        parser.compilerEnv.getLanguageVersion(),
+                        parser.getCompilerEnv().getLanguageVersion(),
                         parser.inUseStrictDirective())) {
                     // If a string contains unicodes, and converted to a keyword,
                     // we convert the last character back to unicode
@@ -800,7 +800,7 @@ class TokenStream {
                 }
 
                 if (containsEscape
-                        && parser.compilerEnv.getLanguageVersion() >= Context.VERSION_ES6
+                        && parser.getCompilerEnv().getLanguageVersion() >= Context.VERSION_ES6
                         && !isValidIdentifierName(str)) {
                     parser.reportError("msg.invalid.escape");
                     return Token.ERROR;
@@ -815,7 +815,7 @@ class TokenStream {
                 stringBufferTop = 0;
                 int base = 10;
                 isHex = isOldOctal = isOctal = isBinary = false;
-                boolean es6 = parser.compilerEnv.getLanguageVersion() >= Context.VERSION_ES6;
+                boolean es6 = parser.getCompilerEnv().getLanguageVersion() >= Context.VERSION_ES6;
 
                 if (c == '0') {
                     c = getChar();
@@ -1048,7 +1048,7 @@ class TokenStream {
                                         c = getChar();
                                         escapeVal = Kit.xDigitToInt(c, escapeVal);
                                         if (escapeVal < 0) {
-                                            if (parser.compilerEnv.getLanguageVersion()
+                                            if (parser.getCompilerEnv().getLanguageVersion()
                                                     >= Context.VERSION_ES6) {
                                                 parser.reportError("msg.invalid.escape");
                                             }
@@ -1120,7 +1120,7 @@ class TokenStream {
             if (c == '#'
                     && cursor == 1
                     && peekChar() == '!'
-                    && !this.parser.calledByCompileFunction) {
+                    && !this.parser.getCalledByCompileFunction()) {
                 // #! hashbang: only on the first line of a Script, no leading whitespace
                 skipLine();
                 return Token.COMMENT;
@@ -1152,7 +1152,7 @@ class TokenStream {
                     return Token.COLON;
                 case '.':
                     if (matchChar('.')) {
-                        if (parser.compilerEnv.getLanguageVersion() >= Context.VERSION_1_8
+                        if (parser.getCompilerEnv().getLanguageVersion() >= Context.VERSION_1_8
                                 && matchChar('.')) {
                             return Token.DOTDOTDOT;
                         }
@@ -1252,7 +1252,7 @@ class TokenStream {
                     return Token.GT;
 
                 case '*':
-                    if (parser.compilerEnv.getLanguageVersion() >= Context.VERSION_ES6) {
+                    if (parser.getCompilerEnv().getLanguageVersion() >= Context.VERSION_ES6) {
                         if (matchChar('*')) {
                             if (matchChar('=')) {
                                 return Token.ASSIGN_EXP;
@@ -1451,7 +1451,7 @@ class TokenStream {
     }
 
     /** Parser calls the method when it gets / or /= in literal context. */
-    void readRegExp(int startToken) throws IOException {
+    public void readRegExp(int startToken) throws IOException {
         int start = tokenBeg;
         stringBufferTop = 0;
         if (startToken == Token.ASSIGN_DIV) {
@@ -1515,7 +1515,7 @@ class TokenStream {
         this.regExpFlags = new String(stringBuffer, reEnd, stringBufferTop - reEnd);
     }
 
-    String readAndClearRegExpFlags() {
+    public String readAndClearRegExpFlags() {
         String flags = this.regExpFlags;
         this.regExpFlags = null;
         return flags;
@@ -1523,7 +1523,7 @@ class TokenStream {
 
     private StringBuilder rawString = new StringBuilder();
 
-    String getRawString() {
+    public String getRawString() {
         if (rawString.length() == 0) {
             return "";
         }
@@ -1587,7 +1587,7 @@ class TokenStream {
         return c;
     }
 
-    int readTemplateLiteral(boolean isTaggedLiteral) throws IOException {
+    public int readTemplateLiteral(boolean isTaggedLiteral) throws IOException {
         rawString.setLength(0);
         stringBufferTop = 0;
         boolean hasInvalidEscapeSequences = false;
@@ -1798,7 +1798,7 @@ class TokenStream {
         return xmlIsAttribute;
     }
 
-    int getFirstXMLToken() throws IOException {
+    public int getFirstXMLToken() throws IOException {
         xmlOpenTagsCount = 0;
         xmlIsAttribute = false;
         xmlIsTagContent = false;
@@ -1807,7 +1807,7 @@ class TokenStream {
         return getNextXMLToken();
     }
 
-    int getNextXMLToken() throws IOException {
+    public int getNextXMLToken() throws IOException {
         tokenBeg = cursor;
         stringBufferTop = 0; // remember the XML
 
@@ -2190,7 +2190,7 @@ class TokenStream {
     }
 
     /** Returns the offset into the current line. */
-    final int getOffset() {
+    public final int getOffset() {
         int n = sourceCursor - lineStart;
         if (lineEndChar >= 0) {
             --n;
@@ -2233,7 +2233,7 @@ class TokenStream {
         return new String(sourceBuffer, beginIndex, count);
     }
 
-    final String getLine() {
+    public final String getLine() {
         int lineEnd = sourceCursor;
         if (lineEndChar >= 0) {
             // move cursor before newline sequence
@@ -2255,7 +2255,7 @@ class TokenStream {
         return substring(lineStart, lineEnd);
     }
 
-    final String getLine(int position, int[] linep) {
+    public final String getLine(int position, int[] linep) {
         assert position >= 0 && position <= cursor;
         assert linep.length == 2;
         int delta = (cursor + ungetCursor) - position;
@@ -2352,7 +2352,7 @@ class TokenStream {
     }
 
     private void markCommentStart(String prefix) {
-        if (parser.compilerEnv.isRecordingComments() && sourceReader != null) {
+        if (parser.getCompilerEnv().isRecordingComments() && sourceReader != null) {
             commentPrefix = prefix;
             commentCursor = sourceCursor - 1;
         }
@@ -2362,7 +2362,7 @@ class TokenStream {
         return commentCursor != -1;
     }
 
-    final String getAndResetCurrentComment() {
+    public final String getAndResetCurrentComment() {
         if (sourceString != null) {
             if (isMarkingComment()) Kit.codeBug();
             return sourceString.substring(tokenBeg, tokenEnd);
@@ -2446,7 +2446,7 @@ class TokenStream {
     private boolean xmlIsTagContent;
     private int xmlOpenTagsCount;
 
-    private Parser parser;
+    private IParser parser;
 
     private String commentPrefix = "";
     private int commentCursor = -1;
