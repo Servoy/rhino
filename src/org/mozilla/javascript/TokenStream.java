@@ -1084,10 +1084,17 @@ public class TokenStream {
                                 break;
 
                             case '\n':
-                                // Remove line terminator after escape to follow
-                                // SpiderMonkey and C/C++
-                                c = getChar();
-                                continue strLoop;
+                            	if (parser.getCompilerEnv().isIdeMode()) {
+                            		// do not remove, otherwise we cannot process multiline strings
+                            		addToString('\\');
+                            		break;
+                            	}
+                            	else {
+                            		// Remove line terminator after escape to follow
+                                    // SpiderMonkey and C/C++
+                                  c = getChar();
+                                  continue strLoop;
+                            	}
 
                             default:
                                 if ('0' <= c && c < '8') {
