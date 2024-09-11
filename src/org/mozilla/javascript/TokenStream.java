@@ -2134,7 +2134,7 @@ public class TokenStream {
                 }
                 cursor++;
                 c = sourceString.codePointAt(sourceCursor);
-                sourceCursor += Character.charCount(c);
+                sourceCursor += 1;// Character.charCount(c);
             } else {
                 if (sourceCursor == sourceEnd) {
                     if (!fillSourceBuffer()) {
