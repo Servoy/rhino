@@ -1121,6 +1121,8 @@ public class TokenStream {
 
                 String str = getStringFromBuffer();
                 this.string = (String) allStrings.intern(str);
+                cursor = sourceCursor;
+                tokenEnd = cursor;
                 return Token.STRING;
             }
 
@@ -1301,6 +1303,7 @@ public class TokenStream {
                                 lookForSlash = true;
                             } else if (c == '/') {
                                 if (lookForSlash) {
+                                	cursor = sourceCursor;
                                     tokenEnd = cursor;
                                     return Token.COMMENT;
                                 }
@@ -1610,6 +1613,8 @@ public class TokenStream {
                 case '`':
                     rawString.setLength(rawString.length() - 1); // don't include "`"
                     this.string = hasInvalidEscapeSequences ? null : getStringFromBuffer();
+                    cursor = sourceCursor;
+                    tokenEnd = cursor;
                     return Token.TEMPLATE_LITERAL;
                 case '$':
                     if (matchTemplateLiteralChar('{')) {
@@ -1862,6 +1867,8 @@ public class TokenStream {
 
                 if (!xmlIsTagContent && xmlOpenTagsCount == 0) {
                     this.string = getStringFromBuffer();
+                    cursor = sourceCursor;
+                    tokenEnd = cursor;
                     return Token.XMLEND;
                 }
             } else {
