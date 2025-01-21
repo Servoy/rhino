@@ -9,7 +9,7 @@ public class BreakPointManager {
 	private HashMap fileMap = new HashMap();
 	private HashMap ids = new HashMap();
 	private HashMap returnNames = new HashMap();
-	private HashMap watchpoints = new HashMap();
+	private HashMap<String,List<BreakPoint>> watchpoints = new HashMap<String,List<BreakPoint>>();
 	private HashMap callNames = new HashMap();
 
 	private boolean suspendOnExit;
@@ -70,9 +70,9 @@ public class BreakPointManager {
 		}
 
 		if (point.isWatch) {
-			ArrayList object = (ArrayList) watchpoints.get(point.expression);
+			List<BreakPoint> object = watchpoints.get(point.expression);
 			if (object == null) {
-				object = new ArrayList();
+				object = new ArrayList<BreakPoint>();
 				watchpoints.put(point.expression, object);
 			}
 			object.add(point);
@@ -191,8 +191,8 @@ public class BreakPointManager {
 		return (BreakPoint) returnNames.get(sn);
 	}
 
-	public synchronized List getWatchPoints(String property) {
-		return (List) watchpoints.get(property);
+	public synchronized List<BreakPoint> getWatchPoints(String property) {
+		return watchpoints.get(property);
 	}
 
 	public synchronized BreakPoint getBreakpoint(String id) {
@@ -206,7 +206,7 @@ public class BreakPointManager {
 		fileMap = new HashMap();
 		ids = new HashMap();
 		returnNames = new HashMap();
-		watchpoints = new HashMap();
+		watchpoints = new HashMap<String, List<BreakPoint>>();
 		callNames = new HashMap();
 		suspendOnEntry = false;
 		suspendOnException = false;

@@ -5,12 +5,14 @@ import java.io.DataInputStream;
 import java.io.IOException;
 import java.io.PrintStream;
 import java.io.UnsupportedEncodingException;
+import java.lang.ref.WeakReference;
 import java.net.Socket;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Stack;
 import java.util.WeakHashMap;
 import java.util.concurrent.ExecutorService;
@@ -659,59 +661,38 @@ public class DBGPDebugger extends Thread implements Debugger,
 	}
 
 	public void access(String property, Scriptable object) {
-		ArrayList list = (ArrayList) getBreakPointManager().getWatchPoints(
-				property);
+		List<BreakPoint> list = getBreakPointManager().getWatchPoints(property);
 		if (list != null) {
-			int size = list.size();
-
-			for (int a = 0; a < size; a++) {
-				BreakPoint watchPoint = (BreakPoint) list.get(a);
-				if (watchPoint != null) {
-					if (watchPoint.enabled)
-						if (watchPoint.isAccess) {
-							String wkey = watchPoint.file + watchPoint.line;
-							String s = (String) cache.get(object);
-							if ((s != null) && (s.equals(wkey))) {
-								getStackManager().sendSuspend(
-										"Break on access watchpoint: "
-												+ property);
-							}
-						}
+			for (BreakPoint watchPoint : list) {
+				if (watchPoint != null && watchPoint.enabled && watchPoint.isAccess) {
+					String wkey = watchPoint.file + watchPoint.line;
+					WeakReference<Scriptable> referenceScriptable = cache.get(wkey);
+					if (referenceScriptable != null && referenceScriptable.get() == object) {
+						getStackManager().sendSuspend("Break on access watchpoint: " + property);
+					}
 				}
 			}
 		}
 	}
 
-	WeakHashMap cache = new WeakHashMap();
+	HashMap<String,WeakReference<Scriptable>> cache = new HashMap<String,WeakReference<Scriptable>>();
 
 	public void modification(String property, Scriptable object) {
-
-		ArrayList list = (ArrayList) getBreakPointManager().getWatchPoints(
-				property);
+		List<BreakPoint> list = getBreakPointManager().getWatchPoints(property);
 		if (list != null && getStackManager().getStackDepth() > 0) {
-			int size = list.size();
-			for (int a = 0; a < size; a++) {
-
-				BreakPoint watchPoint = (BreakPoint) list.get(a);
-				if (watchPoint != null) {
-					if (watchPoint.enabled) {
-						String sn = getStackManager().getStackFrame(0)
-								.getSourceName();
-						int ln = getStackManager().getStackFrame(0)
-								.getLineNumber();
-						String key = sn + ln;
-						String wkey = watchPoint.file + watchPoint.line;
-						if (key.equals(wkey)) {
-							cache.put(object, wkey);
-						}
-						if (watchPoint.isModification) {
-							Object object2 = cache.get(object);
-							if (object2 != null)
-								if (object2.equals(wkey)) {
-									getStackManager().sendSuspend(
-											"Break on modification watchpoint: "
-													+ property);
-								}
+			for (BreakPoint watchPoint : list) {
+				if (watchPoint != null && watchPoint.enabled) {
+					String sn = getStackManager().getStackFrame(0).getSourceName();
+					int ln = getStackManager().getStackFrame(0).getLineNumber();
+					String key = sn + ln;
+					String wkey = watchPoint.file + watchPoint.line;
+					if (key.equals(wkey)) {
+						cache.put(wkey, new WeakReference<Scriptable>(object));
+					}
+					if (watchPoint.isModification) {
+						WeakReference<Scriptable> referenceScriptable = cache.get(wkey);
+						if (referenceScriptable != null && referenceScriptable.get() == object) {
+							getStackManager().sendSuspend("Break on modification watchpoint: " + property);
 						}
 					}
 				}
@@ -719,6 +700,23 @@ public class DBGPDebugger extends Thread implements Debugger,
 		}
 	}
 
+	@Override
+	public void registerVariable(String property, String sourceName, int lineNumber, Scriptable object) {
+		List<BreakPoint> list = getBreakPointManager().getWatchPoints(
+				property);
+		if (list != null) {
+			for (BreakPoint watchPoint: list) {
+				if (watchPoint != null && watchPoint.enabled) {
+					String key = sourceName + lineNumber;
+					String wkey = watchPoint.file + watchPoint.line;
+					if (key.equals(wkey)) {
+						cache.put(key, new WeakReference<Scriptable>(object));
+					}
+				}
+			}
+		}
+	}
+	
 	public void setProperty(String name, String value) {
 
 	}

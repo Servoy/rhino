@@ -7,4 +7,6 @@ public interface IDebuggerWithWatchPoints extends Debugger {
 	public void access(String property, Scriptable object);
 
 	public void modification(String property, Scriptable object);
+	
+	public void registerVariable(String property,String sourceName,int lineNumber, Scriptable object);
 }
