@@ -10,7 +10,7 @@ import java.math.BigInteger;
 import java.util.Arrays;
 
 /** This class implements the BigInt native object. */
-final class NativeBigInt extends IdScriptableObject {
+public final class NativeBigInt extends IdScriptableObject {
     private static final long serialVersionUID = 1335609231306775449L;
 
     private static final Object BIG_INT_TAG = "BigInt";
