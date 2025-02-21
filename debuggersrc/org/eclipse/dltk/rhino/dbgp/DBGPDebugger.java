@@ -313,8 +313,9 @@ public class DBGPDebugger extends Thread implements Debugger,
 								if (ids[a] instanceof Integer) {
 									pvalue = prototype
 											.get(((Integer) ids[a]).intValue(), p);
-								} else
-									pvalue = prototype.get(ids[a].toString(), p);
+								} else {
+									pvalue = getDebuggerPropertyValue(prototype, ids[a].toString(), p);
+								}
 							} catch (Exception e) {
 								// dont let the debugger crash.
 								e.printStackTrace();
@@ -380,6 +381,10 @@ public class DBGPDebugger extends Thread implements Debugger,
 		}
 	}
 
+	protected Object getDebuggerPropertyValue(Scriptable prototype, String id, Scriptable start) {
+	     return prototype.get(id, start);
+	}
+
 	private static String escapeHTML(String content) {
 		content = replace(content, '&', "&amp;");
 		content = replace(content, '"', "&quot;");
@@ -435,7 +440,7 @@ public class DBGPDebugger extends Thread implements Debugger,
 				if (ids[a] instanceof Integer) {
 					pvalue = p.get(((Integer) ids[a]).intValue(), p);
 				} else
-					pvalue = p.get(ids[a].toString(), p);
+					pvalue =  getDebuggerPropertyValue(p, ids[a].toString(), p);
 			} catch (Throwable e) {
 				// dont let the debugger crash.
 				e.printStackTrace();
