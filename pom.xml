@@ -15,7 +15,7 @@
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <maven.compiler.source>21</maven.compiler.source>
         <maven.compiler.target>21</maven.compiler.target>
-        <eclipse.url>https://download.eclipse.org/eclipse/updates/4.31/</eclipse.url>
+        <eclipse.url>https://download.eclipse.org/eclipse/updates/4.34/</eclipse.url>
     </properties>
 
     <repositories>
@@ -41,7 +41,7 @@
                         <configuration>
                             <toolchains>
                                 <jdk>
-                                    <id>JavaSE-17</id>
+                                    <id>JavaSE-21</id>
                                 </jdk>
                             </toolchains>
                         </configuration>
