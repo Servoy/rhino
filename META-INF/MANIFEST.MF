@@ -28,7 +28,7 @@ Export-Package: org.eclipse.dltk.rhino.dbgp,
  org.mozilla.javascript.v8dtoa,
  org.mozilla.javascript.xml,
  org.mozilla.javascript.xmlimpl
-Bundle-RequiredExecutionEnvironment: JavaSE-1.8
+Bundle-RequiredExecutionEnvironment: JavaSE-21
 Application-Library-Allowable-Codebase: *
 Permissions: all-permissions
 Codebase: *

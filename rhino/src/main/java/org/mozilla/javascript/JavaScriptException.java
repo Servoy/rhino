@@ -41,26 +41,27 @@ public class JavaScriptException extends RhinoException {
         // or a NativeError, that may contain the causing javaException
         Object javaCause = value;
         if (value instanceof Scriptable) {
-        	Scriptable obj = (Scriptable) value;
-        	while(obj != null && !(obj instanceof NativeError)) {
-        		obj = obj.getPrototype();
-        	}
-        	if (obj instanceof NativeError) {
-	            NativeError error = (NativeError) obj;
-	            javaCause = error.get("javaException", error);
-	            // Fill in fileName and lineNumber automatically when not specified
-	            // explicitly, see Bugzilla issue #342807
-	            if (Context.getContext().hasFeature(Context.FEATURE_LOCATION_INFORMATION_IN_ERROR)) {
-	                if (!error.has("fileName", error)) {
-	                    error.put("fileName", error, sourceName);
-	                }
-	                if (!error.has("lineNumber", error)) {
-	                    error.put("lineNumber", error, Integer.valueOf(lineNumber));
-	                }
-	                // set stack property, see bug #549604
-	                error.setStackProvider(this);
-	            }
-        	}
+            Scriptable obj = (Scriptable) value;
+            while (obj != null && !(obj instanceof NativeError)) {
+                obj = obj.getPrototype();
+            }
+            if (obj instanceof NativeError) {
+                NativeError error = (NativeError) obj;
+                javaCause = error.get("javaException", error);
+                // Fill in fileName and lineNumber automatically when not specified
+                // explicitly, see Bugzilla issue #342807
+                if (Context.getContext()
+                        .hasFeature(Context.FEATURE_LOCATION_INFORMATION_IN_ERROR)) {
+                    if (!error.has("fileName", error)) {
+                        error.put("fileName", error, sourceName);
+                    }
+                    if (!error.has("lineNumber", error)) {
+                        error.put("lineNumber", error, Integer.valueOf(lineNumber));
+                    }
+                    // set stack property, see bug #549604
+                    error.setStackProvider(this);
+                }
+            }
         }
         if (javaCause instanceof Wrapper) {
             javaCause = ((Wrapper) javaCause).unwrap();
@@ -122,38 +123,41 @@ public class JavaScriptException extends RhinoException {
         return lineNumber();
     }
 
+    @Override
     public void printStackTrace() {
-		super.printStackTrace();
-		Object v = value;
-		if (v instanceof Wrapper) {
-			v = ((Wrapper) v).unwrap();
-		}
-		if (v instanceof Throwable) {
-			((Throwable) v).printStackTrace();
-		}
-	}
+        super.printStackTrace();
+        Object v = value;
+        if (v instanceof Wrapper) {
+            v = ((Wrapper) v).unwrap();
+        }
+        if (v instanceof Throwable) {
+            ((Throwable) v).printStackTrace();
+        }
+    }
 
-	public void printStackTrace(PrintStream s) {
-		super.printStackTrace(s);
-		Object v = value;
-		if (v instanceof Wrapper) {
-			v = ((Wrapper) v).unwrap();
-		}
-		if (v instanceof Throwable) {
-			((Throwable) v).printStackTrace(s);
-		}
-	}
+    @Override
+    public void printStackTrace(PrintStream s) {
+        super.printStackTrace(s);
+        Object v = value;
+        if (v instanceof Wrapper) {
+            v = ((Wrapper) v).unwrap();
+        }
+        if (v instanceof Throwable) {
+            ((Throwable) v).printStackTrace(s);
+        }
+    }
 
-	public void printStackTrace(PrintWriter s) {
-		super.printStackTrace(s);
-		Object v = value;
-		if (v instanceof Wrapper) {
-			v = ((Wrapper) v).unwrap();
-		}
-		if (v instanceof Throwable) {
-			((Throwable) v).printStackTrace(s);
-		}
-	}
+    @Override
+    public void printStackTrace(PrintWriter s) {
+        super.printStackTrace(s);
+        Object v = value;
+        if (v instanceof Wrapper) {
+            v = ((Wrapper) v).unwrap();
+        }
+        if (v instanceof Throwable) {
+            ((Throwable) v).printStackTrace(s);
+        }
+    }
 
     private Object value;
     private String details;

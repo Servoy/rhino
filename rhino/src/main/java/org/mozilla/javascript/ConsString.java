@@ -104,9 +104,9 @@ public class ConsString implements CharSequence, Serializable, Wrapper {
         String str = isFlat ? (String) left : flatten();
         return str.substring(start, end);
     }
-    
+
     @Override
     public Object unwrap() {
-    	return toString();
+        return toString();
     }
 }

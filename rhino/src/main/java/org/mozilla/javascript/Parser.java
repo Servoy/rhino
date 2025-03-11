@@ -105,7 +105,7 @@ import org.mozilla.javascript.ast.Yield;
  * @author Mike McCabe
  * @author Brendan Eich
  */
-public class Parser implements IParser{
+public class Parser implements IParser {
     /** Maximum number of allowed function or constructor arguments, to follow SpiderMonkey. */
     public static final int ARGC_LIMIT = 1 << 16;
 
@@ -197,6 +197,7 @@ public class Parser implements IParser{
         if (compilerEnv.isStrictMode()) addWarning(messageId, messageArg, position, length);
     }
 
+    @Override
     public void addWarning(String messageId, String messageArg) {
         addWarning(messageId, messageArg, currentPos.getPosition(), currentPos.getLength());
     }
@@ -221,6 +222,7 @@ public class Parser implements IParser{
         }
     }
 
+    @Override
     public void addError(String messageId) {
         addError(messageId, currentPos.getPosition(), currentPos.getLength());
     }
@@ -233,6 +235,7 @@ public class Parser implements IParser{
         addError(messageId, messageArg, currentPos.getPosition(), currentPos.getLength());
     }
 
+    @Override
     public void addError(String messageId, int c) {
         String messageArg = Character.toString((char) c);
         addError(messageId, messageArg);
@@ -311,10 +314,12 @@ public class Parser implements IParser{
                 : ScriptRuntime.getMessageById(messageId, messageArg);
     }
 
+    @Override
     public void reportError(String messageId) {
         reportError(messageId, null);
     }
 
+    @Override
     public void reportError(String messageId, String messageArg) {
         reportError(messageId, messageArg, currentPos.getPosition(), currentPos.getLength());
     }
@@ -4826,19 +4831,20 @@ public class Parser implements IParser{
         defaultUseStrictDirective = useStrict;
     }
 
+    @Override
     public boolean inUseStrictDirective() {
         return inUseStrictDirective;
     }
 
-	@Override
-	public boolean getCalledByCompileFunction() {
-		return calledByCompileFunction;
-	}
+    @Override
+    public boolean getCalledByCompileFunction() {
+        return calledByCompileFunction;
+    }
 
-	@Override
-	public CompilerEnvirons getCompilerEnv() {
-		return compilerEnv;
-	}
+    @Override
+    public CompilerEnvirons getCompilerEnv() {
+        return compilerEnv;
+    }
 
     public void reportErrorsIfExists(int baseLineno) {
         if (this.syntaxErrorCount != 0) {

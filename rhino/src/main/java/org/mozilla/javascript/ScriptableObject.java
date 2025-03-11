@@ -1189,7 +1189,7 @@ public abstract class ScriptableObject extends SlotMapOwner
                 } else if (name.startsWith(getterPrefix)) {
                     prefix = getterPrefix;
                 } else if (name.startsWith(genericPrefix)) {
-					prefix = genericPrefix;
+                    prefix = genericPrefix;
                 } else {
                     // note that setterPrefix is among the unhandled names here -
                     // we deal with that when we see the getter

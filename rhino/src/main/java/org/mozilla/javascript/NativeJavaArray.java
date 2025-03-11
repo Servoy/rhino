@@ -92,37 +92,34 @@ public class NativeJavaArray extends NativeJavaObject implements SymbolScriptabl
     @Override
     public void put(String id, Scriptable start, Object value) {
         // Ignore assignments to "length"--it's readonly.
-        if (!id.equals("length"))
-       		super.put(id, start, value);
-    	else if (id.equals("length")) {
-    		int prevLength = length;
-    		length = ((Number) value).intValue();
-    		if (prevLength != length) {
-    			Object tmp = Array.newInstance(array.getClass()
-    					.getComponentType(), length);
-    			System.arraycopy(array, 0, tmp, 0, Math.min(prevLength, length));
-    			array = tmp;
-    		}
-    	}
+        if (id.equals("length")) {
+            int prevLength = length;
+            length = ((Number) value).intValue();
+            if (prevLength != length) {
+                Object tmp = Array.newInstance(array.getClass().getComponentType(), length);
+                System.arraycopy(array, 0, tmp, 0, Math.min(prevLength, length));
+                array = tmp;
+            }
+        } else {
+            super.put(id, start, value);
+        }
     }
 
     @Override
     public void put(int index, Scriptable start, Object value) {
-    	if (0 <= index /* && index < length */) {
-    		if (index >= length) {
-    			put("length", start, new Integer(index + 1));
-    			int prevLength = Array.getLength(array);
-    			if (index > prevLength) {
-    				Object tmp = Array.newInstance(array.getClass()
-    						.getComponentType(), length);
-    				System.arraycopy(array, 0, tmp, 0,
-    						Math.min(prevLength, length));
-    				array = tmp;
-    			}
-    		}
-    		Array.set(array, index, Context.jsToJava(value, cls));
-    		return;
-    	} else {
+        if (0 <= index /* && index < length */) {
+            if (index >= length) {
+                put("length", start, Integer.valueOf(index + 1));
+                int prevLength = Array.getLength(array);
+                if (index > prevLength) {
+                    Object tmp = Array.newInstance(array.getClass().getComponentType(), length);
+                    System.arraycopy(array, 0, tmp, 0, Math.min(prevLength, length));
+                    array = tmp;
+                }
+            }
+            Array.set(array, index, Context.jsToJava(value, cls));
+            return;
+        } else {
             throw Context.reportRuntimeErrorById(
                     "msg.java.array.index.out.of.bounds",
                     String.valueOf(index),
@@ -138,30 +135,28 @@ public class NativeJavaArray extends NativeJavaObject implements SymbolScriptabl
     @Override
     public Object getDefaultValue(Class<?> hint) {
         if (hint == null || hint == ScriptRuntime.StringClass) {
-    		try {
-    			int size = Array.getLength(array);
+            try {
+                int size = Array.getLength(array);
 
-    			StringBuffer sb = new StringBuffer();
-    			sb.append("["); //$NON-NLS-1$
-    			size = size > 100 ? 100 : size;
-    			for (int i = 0; i < size; i++) {
-    				sb.append(Array.get(array, i));
-    				sb.append(","); //$NON-NLS-1$
-    			}
-    			if (sb.length() > 1) {
-    				sb.setLength(sb.length() - 1);
-    			}
-    			sb.append("]"); //$NON-NLS-1$
-    			return sb.toString();
+                StringBuilder sb = new StringBuilder();
+                sb.append("["); // $NON-NLS-1$
+                size = size > 100 ? 100 : size;
+                for (int i = 0; i < size; i++) {
+                    sb.append(Array.get(array, i));
+                    sb.append(","); // $NON-NLS-1$
+                }
+                if (sb.length() > 1) {
+                    sb.setLength(sb.length() - 1);
+                }
+                sb.append("]"); // $NON-NLS-1$
+                return sb.toString();
 
-    		} catch (Exception e) {
-    			return array.toString();
-    		}
+            } catch (Exception e) {
+                return array.toString();
+            }
         }
-        if (hint == ScriptRuntime.BooleanClass)
-            return Boolean.TRUE;
-        if (hint == ScriptRuntime.NumberClass)
-            return ScriptRuntime.NaNobj;
+        if (hint == ScriptRuntime.BooleanClass) return Boolean.TRUE;
+        if (hint == ScriptRuntime.NumberClass) return ScriptRuntime.NaNobj;
         return this;
     }
 

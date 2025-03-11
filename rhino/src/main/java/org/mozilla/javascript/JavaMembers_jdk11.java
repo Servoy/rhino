@@ -16,7 +16,8 @@ import java.util.concurrent.ConcurrentMap;
 
 /** Version of {@link JavaMembers} for modular JDKs. */
 public class JavaMembers_jdk11 extends JavaMembers {
-	private final static ConcurrentMap<AccessibleObject, Boolean>cantAccess = new ConcurrentHashMap<>();
+    private static final ConcurrentMap<AccessibleObject, Boolean> cantAccess =
+            new ConcurrentHashMap<>();
 
     protected JavaMembers_jdk11(Scriptable scope, Class<?> cl, boolean includeProtected) {
         super(scope, cl, includeProtected);
@@ -34,19 +35,19 @@ public class JavaMembers_jdk11 extends JavaMembers {
             }
         }
     }
-    
+
     @Override
     protected boolean makeAccessible(AccessibleObject method, boolean includePrivate) {
-    	if (cantAccess.containsKey(method)) return false;
-    	if (includePrivate && !method.isAccessible()) {
-    		try {
-    			method.setAccessible(true);
-    		} catch(RuntimeException re) {
-    			cantAccess.put(method, Boolean.FALSE);
-    			return false;
-    		}
-    	}
-    	return true;
+        if (cantAccess.containsKey(method)) return false;
+        try {
+            if (includePrivate) { // && !method.canAccess(null)) {
+                method.setAccessible(true);
+            }
+        } catch (RuntimeException re) {
+            cantAccess.put(method, Boolean.FALSE);
+            return false;
+        }
+        return true;
     }
 
     private static boolean isExportedClass(Class<?> clazz) {

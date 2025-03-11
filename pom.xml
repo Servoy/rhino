@@ -6,15 +6,15 @@
     <artifactId>org.eclipse.dltk.javascript.rhino</artifactId>
     <groupId>com.servoy</groupId>
     <packaging>eclipse-plugin</packaging>
-    <version>1.7.15.s3</version>
+    <version>1.8.0.s1</version>
     <prerequisites>
         <maven>3.8.6</maven>
     </prerequisites>    
     <properties>
         <tycho.version>4.0.8</tycho.version>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        <maven.compiler.source>1.8</maven.compiler.source>
-        <maven.compiler.target>1.8</maven.compiler.target>
+        <maven.compiler.source>21</maven.compiler.source>
+        <maven.compiler.target>21</maven.compiler.target>
         <eclipse.url>https://download.eclipse.org/eclipse/updates/4.31/</eclipse.url>
     </properties>
 
@@ -27,7 +27,7 @@
     </repositories>
 	<build>
 		<plugins>
-    <plugin>
+		<plugin>
                         <groupId>org.apache.maven.plugins</groupId>
                         <artifactId>maven-toolchains-plugin</artifactId>
                         <version>3.0.0</version>

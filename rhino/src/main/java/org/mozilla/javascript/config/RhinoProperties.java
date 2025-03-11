@@ -170,6 +170,7 @@ public class RhinoProperties {
         return sb.toString();
     }
 
+    @SuppressWarnings("AnnotateFormatMethod")
     private void logDebug(String msg, Object... args) {
         if (!debug) {
             return;
@@ -177,6 +178,7 @@ public class RhinoProperties {
         System.out.println("[Rhino] " + String.format(msg, args));
     }
 
+    @SuppressWarnings("AnnotateFormatMethod")
     private void logError(String msg, Object... args) {
         System.err.println("[Rhino] " + String.format(msg, args));
     }

@@ -68,18 +68,18 @@ public final class MemberBox implements Serializable {
         this.vararg = constructor.isVarArgs();
     }
 
-	public Class<?>[] getParameterTypes() {
-		return argTypes;
-	}
+    public Class<?>[] getParameterTypes() {
+        return argTypes;
+    }
 
-	/**
-	 * @return the returnType
-	 */
-	public Class<?> getReturnType() {
-		return returnType;
-	}
-	
-	public Method method() {
+    /**
+     * @return the returnType
+     */
+    public Class<?> getReturnType() {
+        return returnType;
+    }
+
+    public Method method() {
         return (Method) memberObject;
     }
 
@@ -296,57 +296,63 @@ public final class MemberBox implements Serializable {
         int modifiers = method.getModifiers();
         if (Modifier.isPublic(modifiers) && !Modifier.isStatic(modifiers)) {
             Class<?> c = method.getDeclaringClass();
-//            if (!Modifier.isPublic(c.getModifiers())) {
-                String name = method.getName();
-                Class<?>[] intfs = c.getInterfaces();
-                for (int i = 0, N = intfs.length; i != N; ++i) {
-                    Class<?> intf = intfs[i];
-                    if (Modifier.isPublic(intf.getModifiers())) {
-                        try {
-                            return intf.getMethod(name, params);
-                        } catch (NoSuchMethodException ex) {
-                        } catch (SecurityException ex) {
-                        }
+            //            if (!Modifier.isPublic(c.getModifiers())) {
+            String name = method.getName();
+            Class<?>[] intfs = c.getInterfaces();
+            for (int i = 0, N = intfs.length; i != N; ++i) {
+                Class<?> intf = intfs[i];
+                if (Modifier.isPublic(intf.getModifiers())) {
+                    try {
+                        return intf.getMethod(name, params);
+                    } catch (NoSuchMethodException ex) {
+                    } catch (SecurityException ex) {
                     }
                 }
-                for (; ; ) {
-                    c = c.getSuperclass();
-                    if (c == null) {
-                        break;
-                    }
-                    if (Modifier.isPublic(c.getModifiers())) {
-                        try {
-                            Method m = c.getMethod(name, params);
-                            int mModifiers = m.getModifiers();
-                            if (Modifier.isPublic(mModifiers) && !Modifier.isStatic(mModifiers) && canAccess(m, target)) {
-                                return m;
-                            }
-                        } catch (NoSuchMethodException ex) {
-                        } catch (SecurityException ex) {
+            }
+            for (; ; ) {
+                c = c.getSuperclass();
+                if (c == null) {
+                    break;
+                }
+                if (Modifier.isPublic(c.getModifiers())) {
+                    try {
+                        Method m = c.getMethod(name, params);
+                        int mModifiers = m.getModifiers();
+                        if (Modifier.isPublic(mModifiers)
+                                && !Modifier.isStatic(mModifiers)
+                                && canAccess(m, target)) {
+                            return m;
                         }
+                    } catch (NoSuchMethodException ex) {
+                    } catch (SecurityException ex) {
                     }
-//                }
+                }
+                //                }
             }
         }
         return null;
     }
-    
+
     private static final Method canAccess;
+
     static {
-    	Method method = null;
-    	try {
-    		method = AccessibleObject.class.getMethod("canAccess", Object.class);
-		} catch (NoSuchMethodException | SecurityException e) {
-		}
-    	canAccess = method;
+        Method method = null;
+        try {
+            method = AccessibleObject.class.getMethod("canAccess", Object.class);
+        } catch (NoSuchMethodException | SecurityException e) {
+        }
+        canAccess = method;
     }
+
     private static boolean canAccess(Method method, Object target) {
-    	if (canAccess != null)
-			try {
-				return ((Boolean)canAccess.invoke(method, target)).booleanValue();
-			} catch (IllegalAccessException | IllegalArgumentException | InvocationTargetException e) {
-			}
-    	return true;
+        if (canAccess != null)
+            try {
+                return ((Boolean) canAccess.invoke(method, target)).booleanValue();
+            } catch (IllegalAccessException
+                    | IllegalArgumentException
+                    | InvocationTargetException e) {
+            }
+        return true;
     }
 
     private void readObject(ObjectInputStream in) throws IOException, ClassNotFoundException {

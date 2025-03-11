@@ -48,11 +48,12 @@ final class NativeString extends IdScriptableObject implements Wrapper {
     }
 
     /**
-	 * @see org.mozilla.javascript.Wrapper#unwrap()
-	 */
-	public Object unwrap() {
-		return string;
-	}
+     * @see org.mozilla.javascript.Wrapper#unwrap()
+     */
+    @Override
+    public Object unwrap() {
+        return string;
+    }
 
     private static final int Id_length = 1, MAX_INSTANCE_ID = 1;
 

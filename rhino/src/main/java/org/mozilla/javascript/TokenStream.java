@@ -787,7 +787,8 @@ public class TokenStream implements Parser.CurrentPositionReporter {
                                     parser.inUseStrictDirective());
                     if (result != Token.EOF) {
                         if ((result == Token.LET || result == Token.YIELD)
-                                && parser.getCompilerEnv().getLanguageVersion() < Context.VERSION_1_7) {
+                                && parser.getCompilerEnv().getLanguageVersion()
+                                        < Context.VERSION_1_7) {
                             // LET and YIELD are tokens only in 1.7 and later
                             string = result == Token.LET ? "let" : "yield";
                             result = Token.NAME;
@@ -797,7 +798,8 @@ public class TokenStream implements Parser.CurrentPositionReporter {
                         this.string = internString(str);
                         if (result != Token.RESERVED) {
                             return result;
-                        } else if (parser.getCompilerEnv().getLanguageVersion() >= Context.VERSION_ES6) {
+                        } else if (parser.getCompilerEnv().getLanguageVersion()
+                                >= Context.VERSION_ES6) {
                             return result;
                         } else if (!parser.getCompilerEnv().isReservedKeywordAsIdentifier()) {
                             return result;
@@ -1097,17 +1099,16 @@ public class TokenStream implements Parser.CurrentPositionReporter {
                                 break;
 
                             case '\n':
-                            	if (parser.getCompilerEnv().isIdeMode()) {
-                            		// do not remove, otherwise we cannot process multiline strings
-                            		addToString('\\');
-                            		break;
-                            	}
-                            	else {
-                            		// Remove line terminator after escape to follow
+                                if (parser.getCompilerEnv().isIdeMode()) {
+                                    // do not remove, otherwise we cannot process multiline strings
+                                    addToString('\\');
+                                    break;
+                                } else {
+                                    // Remove line terminator after escape to follow
                                     // SpiderMonkey and C/C++
-                                  c = getChar();
-                                  continue strLoop;
-                            	}
+                                    c = getChar();
+                                    continue strLoop;
+                                }
 
                             default:
                                 if ('0' <= c && c < '8') {

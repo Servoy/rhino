@@ -97,31 +97,29 @@ public class NativeJavaPackage extends ScriptableObject {
 
     synchronized Object getPkgProperty(String name, Scriptable start, boolean createPkg) {
         Object cached = super.get(name, start);
-        if (cached != NOT_FOUND)
-            return cached;
+        if (cached != NOT_FOUND) return cached;
         Scriptable newValue = null;
-        String className = (packageName.length() == 0)
-                               ? name : packageName + '.' + name;
+        String className = (packageName.length() == 0) ? name : packageName + '.' + name;
         if (!negativeCache.contains(name)) {
-	        Context cx = Context.getContext();
-	        ClassShutter shutter = cx.getClassShutter();
-	        if (shutter == null || shutter.visibleToScripts(className)) {
-	            Class<?> cl = null;
-	            if (classLoader != null) {
-	                cl = Kit.classOrNull(classLoader, className);
-	            } else {
-	                cl = Kit.classOrNull(className);
-	            }
-	            if (cl != null) {
-	                WrapFactory wrapFactory = cx.getWrapFactory();
-	                newValue = wrapFactory.wrapJavaClass(cx, getTopLevelScope(this), cl);
-	                newValue.setPrototype(getPrototype());
-	            }
-	        }
-	        if (newValue == null) {
-	            // Performance optimization: see bug 421071
-	        	negativeCache.add(name);
-	        }
+            Context cx = Context.getContext();
+            ClassShutter shutter = cx.getClassShutter();
+            if (shutter == null || shutter.visibleToScripts(className)) {
+                Class<?> cl = null;
+                if (classLoader != null) {
+                    cl = Kit.classOrNull(classLoader, className);
+                } else {
+                    cl = Kit.classOrNull(className);
+                }
+                if (cl != null) {
+                    WrapFactory wrapFactory = cx.getWrapFactory();
+                    newValue = wrapFactory.wrapJavaClass(cx, getTopLevelScope(this), cl);
+                    newValue.setPrototype(getPrototype());
+                }
+            }
+            if (newValue == null) {
+                // Performance optimization: see bug 421071
+                negativeCache.add(name);
+            }
         }
         if (newValue == null && createPkg) {
             NativeJavaPackage pkg;

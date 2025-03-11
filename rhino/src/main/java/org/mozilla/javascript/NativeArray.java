@@ -29,7 +29,7 @@ import org.mozilla.javascript.xml.XMLObject;
  * @author Norris Boyd
  * @author Mike McCabe
  */
-public class NativeArray extends IdScriptableObject implements List,Wrapper {
+public class NativeArray extends IdScriptableObject implements List, Wrapper {
     private static final long serialVersionUID = 7331366857676127338L;
 
     /*
@@ -103,31 +103,33 @@ public class NativeArray extends IdScriptableObject implements List,Wrapper {
     }
 
     /**
-	 * @see org.mozilla.javascript.Wrapper#unwrap()
-	 */
-	public Object unwrap() {
-		Object[] ids = getIds();
+     * @see org.mozilla.javascript.Wrapper#unwrap()
+     */
+    @Override
+    public Object unwrap() {
+        Object[] ids = getIds();
 
-		for (int i = 0; i < ids.length; i++) {
-			if (ids[i] instanceof String || (ids[i] instanceof Number && ((Number) ids[i]).intValue() < 0)) {
-				return this;
-			}
-		}
+        for (int i = 0; i < ids.length; i++) {
+            if (ids[i] instanceof String
+                    || (ids[i] instanceof Number && ((Number) ids[i]).intValue() < 0)) {
+                return this;
+            }
+        }
 
-		ArrayList<Object> al = new ArrayList<Object>(ids.length);
-		for (int i = 0; i < ids.length; i++) {
-			if (ids[i] instanceof Number) {
-				int index = ((Number) ids[i]).intValue();
-				Object o = get(index, this);
-				if (o != NOT_FOUND) {
-					while (al.size() <= index)
-						al.add(null);
-					al.set(index, o);
-				}
-			}
-		}
-		return al.toArray();
-	}
+        ArrayList<Object> al = new ArrayList<Object>(ids.length);
+        for (int i = 0; i < ids.length; i++) {
+            if (ids[i] instanceof Number) {
+                int index = ((Number) ids[i]).intValue();
+                Object o = get(index, this);
+                if (o != NOT_FOUND) {
+                    while (al.size() <= index) al.add(null);
+                    al.set(index, o);
+                }
+            }
+        }
+        return al.toArray();
+    }
+
     private static final int Id_length = 1, MAX_INSTANCE_ID = 1;
 
     @Override
@@ -1227,12 +1229,12 @@ public class NativeArray extends IdScriptableObject implements List,Wrapper {
         String separator;
 
         // We want always this to be default to this, just as native java array
-//        if (toSource) {
-            result.append('[');
-            separator = ",";
-//        } else {
-//            separator = ",";
-//        }
+        //        if (toSource) {
+        result.append('[');
+        separator = ",";
+        //        } else {
+        //            separator = ",";
+        //        }
 
         boolean haslast = false;
         long i = 0;
@@ -1288,16 +1290,15 @@ public class NativeArray extends IdScriptableObject implements List,Wrapper {
                     }
                 }
                 Object[] ids = thisObj.getIds();
-				for (int j = 0; j < ids.length; j++) {
-					if (ids[j] instanceof String) {
-						if (j > 0)
-							result.append(separator);
-						result.append(ids[j]);
-						result.append("=");
-						result.append(ScriptRuntime.toString(thisObj.get(
-								(String) ids[j], thisObj)));
-					}
-				}
+                for (int j = 0; j < ids.length; j++) {
+                    if (ids[j] instanceof String) {
+                        if (j > 0) result.append(separator);
+                        result.append(ids[j]);
+                        result.append("=");
+                        result.append(
+                                ScriptRuntime.toString(thisObj.get((String) ids[j], thisObj)));
+                    }
+                }
                 // processing of thisObj done, remove it from the recursion detector
                 // to allow thisObj to be again in the array later on
                 cx.iterating.remove(o);
@@ -1308,12 +1309,12 @@ public class NativeArray extends IdScriptableObject implements List,Wrapper {
             }
         }
 
-    	// We want always this to be default to this, just as native java array
-		// if (toSource) {
-            // for [,,].length behavior; we want toString to be symmetric.
-            if (!haslast && i > 0) result.append(", ]");
-            else result.append(']');
-//        }
+        // We want always this to be default to this, just as native java array
+        // if (toSource) {
+        // for [,,].length behavior; we want toString to be symmetric.
+        if (!haslast && i > 0) result.append(", ]");
+        else result.append(']');
+        //        }
         return result.toString();
     }
 
@@ -2242,7 +2243,8 @@ public class NativeArray extends IdScriptableObject implements List,Wrapper {
         if (o instanceof NativeProxy) {
             return js_isArray(((NativeProxy) o).getTargetThrowIfRevoked());
         }
-        return "Array".equals(((Scriptable) o).getClassName()) || "JavaArray".equals(((Scriptable)o).getClassName());
+        return "Array".equals(((Scriptable) o).getClassName())
+                || "JavaArray".equals(((Scriptable) o).getClassName());
     }
 
     private static Object js_toSorted(

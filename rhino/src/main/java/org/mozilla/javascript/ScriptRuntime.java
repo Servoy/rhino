@@ -369,8 +369,8 @@ public class ScriptRuntime {
                 double d = ((Number) val).doubleValue();
                 return (!Double.isNaN(d) && d != 0.0);
             }
-        	if (val instanceof Date) return true;
-        	if (val.getClass().isArray()) return Array.getLength(val) != 0;
+            if (val instanceof Date) return true;
+            if (val.getClass().isArray()) return Array.getLength(val) != 0;
             if (val instanceof Scriptable) {
                 if (val instanceof ScriptableObject
                         && ((ScriptableObject) val).avoidObjectDetection()) {
@@ -1091,8 +1091,8 @@ public class ScriptRuntime {
             return toString(d);
         }
         if (value instanceof Date) {
-			return value.toString();
-		}
+            return value.toString();
+        }
         if (value instanceof Boolean) {
             return toString(value);
         }
@@ -1256,11 +1256,11 @@ public class ScriptRuntime {
             setBuiltinProtoAndParent(result, scope, TopLevel.Builtins.String);
             return result;
         }
-		if (val instanceof Date) {
-			Object[] args = { val };
-			scope = ScriptableObject.getTopLevelScope(scope);
-			return newObject(cx, scope, "Date", args);
-		}
+        if (val instanceof Date) {
+            Object[] args = {val};
+            scope = ScriptableObject.getTopLevelScope(scope);
+            return newObject(cx, scope, "Date", args);
+        }
         if (cx.getLanguageVersion() >= Context.VERSION_ES6 && val instanceof BigInteger) {
             NativeBigInt result = new NativeBigInt(((BigInteger) val));
             setBuiltinProtoAndParent(result, scope, TopLevel.Builtins.BigInt);
@@ -2226,15 +2226,15 @@ public class ScriptRuntime {
                 if (withObj instanceof XMLObject) {
                     XMLObject xmlObj = (XMLObject) withObj;
                     if (asFunctionCall) {
-                        result = getPropFunctionAndThisHelper(xmlObj, name,
-                                                              cx, withObj, isOptionalChainingCall);
+                        result =
+                                getPropFunctionAndThisHelper(
+                                        xmlObj, name, cx, withObj, isOptionalChainingCall);
                         thisObj = lastStoredScriptable(cx); // Must consume
 
                         if (result != null) {
                             break;
                         }
-                    }
-                    else if (xmlObj.has(name, xmlObj)) {
+                    } else if (xmlObj.has(name, xmlObj)) {
                         // function this should be the target object of with
                         thisObj = xmlObj;
                         result = xmlObj.get(name, xmlObj);
@@ -3033,16 +3033,17 @@ public class ScriptRuntime {
             throw notFunctionError(ctor);
         }
         Function function = (Function) ctor;
-    	// HACK! Test if this alles makes a new Date with a java.util.Date
-		// constructor
-		// Then replace the date argument with the Long time object.
-		if (function instanceof BaseFunction) {
-			if ("Date".equals(((BaseFunction) function).getFunctionName())
-					&& args != null && args.length == 1
-					&& args[0] instanceof Date) {
-				args[0] = new Long(((Date) args[0]).getTime());
-			}
-		}
+        // HACK! Test if this alles makes a new Date with a java.util.Date
+        // constructor
+        // Then replace the date argument with the Long time object.
+        if (function instanceof BaseFunction) {
+            if ("Date".equals(((BaseFunction) function).getFunctionName())
+                    && args != null
+                    && args.length == 1
+                    && args[0] instanceof Date) {
+                args[0] = Long.valueOf(((Date) args[0]).getTime());
+            }
+        }
         return ((Constructable) ctor).construct(cx, scope, args);
     }
 
@@ -3306,8 +3307,7 @@ public class ScriptRuntime {
     // as "~toInt32(val)"
 
     public static Object add(Object lval, Object rval, Context cx) {
-	    if (lval == null && rval == null)
-		    return null;
+        if (lval == null && rval == null) return null;
 
         // if lval and rval are primitive numerics of the same type, give them priority
         if (lval instanceof Integer && rval instanceof Integer) {
@@ -3890,29 +3890,29 @@ public class ScriptRuntime {
      * <p>See ECMA 11.9
      */
     public static boolean eq(Object x, Object y) {
-    	// SPECIAL DATE HANDLING
-    	if (x instanceof Date || x instanceof NativeDate) {
-    		if (x instanceof Wrapper) {
-    			x = ((Wrapper) x).unwrap();
-    		}
-    		if (y instanceof Wrapper) {
-    			y = ((Wrapper) y).unwrap();
-    		}
-    		if (y instanceof Date) {
-    			return ((Date) x).getTime() == ((Date) y).getTime();
-    		}
-    		return false;
-    	} else if ((y instanceof Date || y instanceof NativeDate) && x instanceof Wrapper) {
-    		if (y instanceof Wrapper) {
-    			y = ((Wrapper) y).unwrap();
-    		}
-    		x = ((Wrapper) x).unwrap();
-    		if (x instanceof Date) {
-    			return ((Date) x).getTime() == ((Date) y).getTime();
-    		}
-    		return false;
-    	}
-    	// END Special date handling
+        // SPECIAL DATE HANDLING
+        if (x instanceof Date || x instanceof NativeDate) {
+            if (x instanceof Wrapper) {
+                x = ((Wrapper) x).unwrap();
+            }
+            if (y instanceof Wrapper) {
+                y = ((Wrapper) y).unwrap();
+            }
+            if (y instanceof Date) {
+                return ((Date) x).getTime() == ((Date) y).getTime();
+            }
+            return false;
+        } else if ((y instanceof Date || y instanceof NativeDate) && x instanceof Wrapper) {
+            if (y instanceof Wrapper) {
+                y = ((Wrapper) y).unwrap();
+            }
+            x = ((Wrapper) x).unwrap();
+            if (x instanceof Date) {
+                return ((Date) x).getTime() == ((Date) y).getTime();
+            }
+            return false;
+        }
+        // END Special date handling
         if (x == null || Undefined.isUndefined(x)) {
             if (y == null || Undefined.isUndefined(y)) {
                 return true;
@@ -3988,7 +3988,8 @@ public class ScriptRuntime {
                     // the LiveConnect case.
                     Object unwrappedX = ((Wrapper) x).unwrap();
                     Object unwrappedY = ((Wrapper) y).unwrap();
-                    return unwrappedX == unwrappedY || (unwrappedX != null && unwrappedX.equals(unwrappedY))
+                    return unwrappedX == unwrappedY
+                            || (unwrappedX != null && unwrappedX.equals(unwrappedY))
                             || (isPrimitive(unwrappedX)
                                     && isPrimitive(unwrappedY)
                                     && eq(unwrappedX, unwrappedY));
@@ -4088,7 +4089,7 @@ public class ScriptRuntime {
             } else if (y instanceof CharSequence) {
                 return x == toNumber(y);
             } else if (y instanceof Date) {
-				return x == toNumber(y);
+                return x == toNumber(y);
             } else if (y instanceof Boolean) {
                 return x == (((Boolean) y).booleanValue() ? 1.0 : +0.0);
             } else if (isSymbol(y)) {
@@ -4118,7 +4119,7 @@ public class ScriptRuntime {
             } else if (y instanceof Number) {
                 return eqBigInt(x, ((Number) y).doubleValue());
             } else if (y instanceof Date) {
-				return eqBigInt(x, ((Date) y).getTime() );
+                return eqBigInt(x, BigInteger.valueOf(((Date) y).getTime()));
             } else if (y instanceof CharSequence) {
                 BigInteger biy;
                 try {
@@ -4182,7 +4183,7 @@ public class ScriptRuntime {
             } else if (y instanceof Boolean) {
                 return toNumber(x.toString()) == (((Boolean) y).booleanValue() ? 1.0 : 0.0);
             } else if (y instanceof Date) {
-				return y.toString().equals(x);
+                return y.toString().equals(x.toString());
             } else if (isSymbol(y)) {
                 return false;
             } else if (y instanceof Scriptable) {
@@ -4211,9 +4212,9 @@ public class ScriptRuntime {
             return !Double.isNaN(d);
         }
         if (y instanceof Date) {
-        	return y.equals(x);
+            return y.equals(x);
         } else if (x instanceof Date) {
-        	return x.equals(y);
+            return x.equals(y);
         } else if (x == null || x == Undefined.instance || x == Undefined.SCRIPTABLE_UNDEFINED) {
             if ((x == Undefined.instance && y == Undefined.SCRIPTABLE_UNDEFINED)
                     || (x == Undefined.SCRIPTABLE_UNDEFINED && y == Undefined.instance))
@@ -4237,8 +4238,8 @@ public class ScriptRuntime {
             }
         } else if (x instanceof Scriptable) {
             if (x instanceof Wrapper && y instanceof Wrapper) {
-				Object unwrap = ((Wrapper) x).unwrap();
-				if (unwrap != null) return unwrap.equals(((Wrapper) y).unwrap());
+                Object unwrap = ((Wrapper) x).unwrap();
+                if (unwrap != null) return unwrap.equals(((Wrapper) y).unwrap());
                 return ((Wrapper) x).unwrap() == ((Wrapper) y).unwrap();
             }
             if (x instanceof Delegator) {
@@ -4271,20 +4272,18 @@ public class ScriptRuntime {
             throw typeErrorById("msg.instanceof.not.object");
         }
 
-        if (a == null || a == Undefined.instance)
-			return false;
+        if (a == null || a == Undefined.instance) return false;
 
         // for primitive values on LHS, return false
         // XXX we may want to change this so that
         // 5 instanceof Number == true
         if (!(a instanceof Scriptable)) {
-        	Scriptable converted = ScriptRuntime.toObject(cx, cx.topCallScope,
-        			a);
-        	if (converted != null) {
-        		a = converted;
-        	} else {
-        		return false;
-        	}
+            Scriptable converted = ScriptRuntime.toObject(cx, cx.topCallScope, a);
+            if (converted != null) {
+                a = converted;
+            } else {
+                return false;
+            }
         }
 
         return ((Scriptable) b).hasInstance((Scriptable) a);

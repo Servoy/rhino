@@ -70,50 +70,49 @@ public class JavaMembers {
     }
 
     public List<String> getFieldIds(boolean isStatic) {
-		Map<String, Object> ht = isStatic ? staticMembers : members;
-		ArrayList<String> list = new ArrayList<String>();
-		Iterator<String> keys = ht.keySet().iterator();
-		while (keys.hasNext()) {
-			String key = keys.next();
-			if (!(ht.get(key) instanceof NativeJavaMethod)) {
-				list.add(key);
-			}
-		}
-		return list;
+        Map<String, Object> ht = isStatic ? staticMembers : members;
+        ArrayList<String> list = new ArrayList<String>();
+        Iterator<String> keys = ht.keySet().iterator();
+        while (keys.hasNext()) {
+            String key = keys.next();
+            if (!(ht.get(key) instanceof NativeJavaMethod)) {
+                list.add(key);
+            }
+        }
+        return list;
+    }
 
-	}
+    public List<String> getMethodIds(boolean isStatic) {
+        Map<String, Object> ht = isStatic ? staticMembers : members;
+        ArrayList<String> list = new ArrayList<String>();
+        Iterator<String> keys = ht.keySet().iterator();
+        while (keys.hasNext()) {
+            String key = keys.next();
+            if ((ht.get(key) instanceof NativeJavaMethod)) {
+                list.add(key);
+            }
+        }
+        return list;
+    }
 
-	public List<String> getMethodIds(boolean isStatic) {
-		Map<String, Object> ht = isStatic ? staticMembers : members;
-		ArrayList<String> list = new ArrayList<String>();
-		Iterator<String> keys = ht.keySet().iterator();
-		while (keys.hasNext()) {
-			String key = keys.next();
-			if ((ht.get(key) instanceof NativeJavaMethod)) {
-				list.add(key);
-			}
-		}
-		return list;
-	}
+    public NativeJavaMethod getMethod(String id, boolean isStatic) {
+        Map<String, Object> ht = isStatic ? staticMembers : members;
+        Object o = ht.get(id);
+        if (o instanceof NativeJavaMethod) {
+            return (NativeJavaMethod) o;
+        }
+        return null;
+    }
 
-	public NativeJavaMethod getMethod(String id, boolean isStatic) {
-		Map<String, Object> ht = isStatic ? staticMembers : members;
-		Object o = ht.get(id);
-		if (o instanceof NativeJavaMethod) {
-			return (NativeJavaMethod) o;
-		}
-		return null;
-	}
-
-	public Object getField(String id, boolean isStatic) {
-		Map<String, Object> ht = isStatic ? staticMembers : members;
-		return ht.get(id);
-		// if(o instanceof JavaMembers.BeanProperty)
-		// {
-		// return (JavaMembers.BeanProperty)o;
-		// }
-		// return null;
-	}
+    public Object getField(String id, boolean isStatic) {
+        Map<String, Object> ht = isStatic ? staticMembers : members;
+        return ht.get(id);
+        // if(o instanceof JavaMembers.BeanProperty)
+        // {
+        // return (JavaMembers.BeanProperty)o;
+        // }
+        // return null;
+    }
 
     boolean has(String name, boolean isStatic) {
         Map<String, Object> ht = isStatic ? staticMembers : members;
@@ -185,14 +184,14 @@ public class JavaMembers {
             // If there's only one setter or if the value is null, use the
             // main setter. Otherwise, let the NativeJavaMethod decide which
             // setter to use but use the getters return type (there could be
-			// multiply settings)
+            // multiply settings)
             Class setType = null;
-			if (bp.setters == null && bp.setter.argTypes.length == 1) {
-				setType = bp.setter.argTypes[0];
-			} else {
-				setType = bp.getter.returnType;
-			}
-			Object[] args = {Context.jsToJava(value, setType)};
+            if (bp.setters == null && bp.setter.argTypes.length == 1) {
+                setType = bp.setter.argTypes[0];
+            } else {
+                setType = bp.getter.returnType;
+            }
+            Object[] args = {Context.jsToJava(value, setType)};
             if (bp.setters == null || value == null) {
                 try {
                     bp.setter.invoke(javaObject, args);
@@ -237,23 +236,21 @@ public class JavaMembers {
         return map.keySet().toArray(new Object[0]);
     }
 
-    boolean isDeprecated(String name,boolean isStatic)
-    {
-    	  Map<String,Object> ht = isStatic ? staticMembers : members;
-          Object member = ht.get(name);
-          if (!isStatic && member == null) {
-              // Try to get static member from instance (LC3)
-              member = staticMembers.get(name);
-          }
-          if (member instanceof BeanProperty) {
-              BeanProperty bp = (BeanProperty) member;
-             
-              if (bp.getter.method().getAnnotation(Deprecated.class) != null)
-              {
-            	  return true;
-              }
-          }
-          return false;
+    boolean isDeprecated(String name, boolean isStatic) {
+        Map<String, Object> ht = isStatic ? staticMembers : members;
+        Object member = ht.get(name);
+        if (!isStatic && member == null) {
+            // Try to get static member from instance (LC3)
+            member = staticMembers.get(name);
+        }
+        if (member instanceof BeanProperty) {
+            BeanProperty bp = (BeanProperty) member;
+
+            if (bp.getter.method().getAnnotation(Deprecated.class) != null) {
+                return true;
+            }
+        }
+        return false;
     }
 
     static String javaSignature(Class<?> type) {
@@ -401,9 +398,9 @@ public class JavaMembers {
                                 if (isPublic(mods) || isProtected(mods) || includePrivate) {
                                     MethodSignature sig = new MethodSignature(method);
                                     if (!map.containsKey(sig)) {
-                                    	if (makeAccessible(method, includePrivate )) {
-	                                        map.put(sig, method);
-                                    	}
+                                        if (makeAccessible(method, includePrivate)) {
+                                            map.put(sig, method);
+                                        }
                                     }
                                 }
                             }
@@ -448,15 +445,16 @@ public class JavaMembers {
     }
 
     protected boolean makeAccessible(AccessibleObject method, boolean includePrivate) {
-    	try {
-			if (!method.isAccessible()) method.setAccessible(true);
-		} catch (RuntimeException e) {
-			return false;
-		}
-    	return true;
-	}
+        try {
+            // if (!method.canAccess(null)) method.setAccessible(true);
+            method.setAccessible(true);
+        } catch (RuntimeException e) {
+            return false;
+        }
+        return true;
+    }
 
-	void discoverPublicMethods(Class<?> clazz, Map<MethodSignature, Method> map) {
+    void discoverPublicMethods(Class<?> clazz, Map<MethodSignature, Method> map) {
         Method[] methods = clazz.getMethods();
         for (Method method : methods) {
             registerMethod(map, method);
@@ -578,7 +576,7 @@ public class JavaMembers {
         // Create bean properties from corresponding get/set methods first for
         // static members and then for instance members
         for (int tableCursor = 0; tableCursor != 2; ++tableCursor) {
-            makeBeanProperties(tableCursor == 0,includePrivate);
+            makeBeanProperties(tableCursor == 0, includePrivate);
         }
 
         // Reflect constructors
@@ -590,180 +588,177 @@ public class JavaMembers {
         ctors = new NativeJavaMethod(ctorMembers, cl.getSimpleName());
     }
 
-	/**
-	 * @param includePrivate
-	 * @param tableCursor
-	 */
-	protected void makeBeanProperties(boolean isStatic,boolean includePrivate) {
-		Map<String, Object> ht = isStatic ? staticMembers : members;
+    /**
+     * @param includePrivate
+     * @param tableCursor
+     */
+    protected void makeBeanProperties(boolean isStatic, boolean includePrivate) {
+        Map<String, Object> ht = isStatic ? staticMembers : members;
 
-		Map<String, BeanProperty> toAdd = new HashMap<String, BeanProperty>();
-		ArrayList<String> toRemove = new ArrayList<String>();
-		
-		// Now, For each member, make "bean" properties.
-		for (String name : ht.keySet()) {
-		    // Is this a getter?
-		    boolean memberIsGetMethod = name.startsWith("get");
-//		    boolean memberIsSetMethod = name.startsWith("set");
-		    boolean memberIsIsMethod = name.startsWith("is");
-		    if (memberIsGetMethod || memberIsIsMethod /*|| memberIsSetMethod*/) {
-		        // Double check name component.
-		        String nameComponent = name.substring(memberIsIsMethod ? 2 : 3);
-		        if (nameComponent.length() == 0) continue;
+        Map<String, BeanProperty> toAdd = new HashMap<String, BeanProperty>();
+        ArrayList<String> toRemove = new ArrayList<String>();
 
-		        // Make the bean property name.
-		        String beanPropertyName = nameComponent;
-		        char ch0 = nameComponent.charAt(0);
-		        if (Character.isUpperCase(ch0)) {
-		            if (nameComponent.length() == 1) {
-		                beanPropertyName = nameComponent.toLowerCase(Locale.ROOT);
-		            } else {
-		                char ch1 = nameComponent.charAt(1);
-		                if (!Character.isUpperCase(ch1)) {
-		                    beanPropertyName =
-		                            Character.toLowerCase(ch0) + nameComponent.substring(1);
-		                }
-		            }
-		        }
+        // Now, For each member, make "bean" properties.
+        for (String name : ht.keySet()) {
+            // Is this a getter?
+            boolean memberIsGetMethod = name.startsWith("get");
+            //		    boolean memberIsSetMethod = name.startsWith("set");
+            boolean memberIsIsMethod = name.startsWith("is");
+            if (memberIsGetMethod || memberIsIsMethod /*|| memberIsSetMethod*/) {
+                // Double check name component.
+                String nameComponent = name.substring(memberIsIsMethod ? 2 : 3);
+                if (nameComponent.length() == 0) continue;
 
-		        // If we already have a member by this name, don't do this
-		        // property.
-		        if (toAdd.containsKey(beanPropertyName)) continue;
-		        Object v = ht.get(beanPropertyName);
-		        if (v != null) {
-		            // A private field shouldn't mask a public getter/setter
-		            if (!includePrivate
-		                    || !(v instanceof Member)
-		                    || !Modifier.isPrivate(((Member) v).getModifiers())) {
-
-		                continue;
-		            }
-		        }
-
-		        // Find the getter method, or if there is none, the is-
-		        // method.
-		        MemberBox getter = null;
-		        getter = findGetter(isStatic, ht, "get", nameComponent);
-		        // If there was no valid getter, check for an is- method.
-		        if (getter == null) {
-		            getter = findGetter(isStatic, ht, "is", nameComponent);
-		        }
-
-		        // setter
-		        MemberBox setter = null;
-		        NativeJavaMethod setters = null;
-		        String setterName = "set".concat(nameComponent);
-
-		        if (ht.containsKey(setterName)) {
-		            // Is this value a method?
-		            Object member = ht.get(setterName);
-		            if (member instanceof NativeJavaMethod) {
-		                NativeJavaMethod njmSet = (NativeJavaMethod) member;
-		                if (getter != null) {
-		                    // We have a getter. Now, do we have a matching
-		                    // setter?
-		                    Class<?> type = getter.method().getReturnType();
-		                    setter = extractSetMethod(type, njmSet.methods, isStatic);
-		                } else {
-		                    // No getter, find any set method
-		                    setter = extractSetMethod(njmSet.methods, isStatic);
-		                }
-		                if (njmSet.methods.length > 1) {
-		                    setters = njmSet;
-		                }
-		            }
-		        }
-		        if (setter != null && getter != null) {
-                	// Make the property.
-                	BeanProperty bp = new BeanProperty(getter, setter,
-                			setters);
-                	toAdd.put(beanPropertyName, bp);
-                	Object object = ht.get(name);
-                	boolean delete = true;
-                	if (object instanceof NativeJavaMethod) {
-                		delete = ((NativeJavaMethod) object).methods.length == 1;
-                	}
-                	if (delete && shouldDeleteGetAndSetMethods()) {
-                		toRemove.add(name);
-                		toRemove.add(setterName);
-                	}
+                // Make the bean property name.
+                String beanPropertyName = nameComponent;
+                char ch0 = nameComponent.charAt(0);
+                if (Character.isUpperCase(ch0)) {
+                    if (nameComponent.length() == 1) {
+                        beanPropertyName = nameComponent.toLowerCase(Locale.ROOT);
+                    } else {
+                        char ch1 = nameComponent.charAt(1);
+                        if (!Character.isUpperCase(ch1)) {
+                            beanPropertyName =
+                                    Character.toLowerCase(ch0) + nameComponent.substring(1);
+                        }
+                    }
                 }
-		   }
-		}
 
-		// Add the new bean properties.
-		ht.putAll(toAdd);
-		
-    	deleteGetAndSetMethods(isStatic, toRemove);
-	}
+                // If we already have a member by this name, don't do this
+                // property.
+                if (toAdd.containsKey(beanPropertyName)) continue;
+                Object v = ht.get(beanPropertyName);
+                if (v != null) {
+                    // A private field shouldn't mask a public getter/setter
+                    if (!includePrivate
+                            || !(v instanceof Member)
+                            || !Modifier.isPrivate(((Member) v).getModifiers())) {
+
+                        continue;
+                    }
+                }
+
+                // Find the getter method, or if there is none, the is-
+                // method.
+                MemberBox getter = null;
+                getter = findGetter(isStatic, ht, "get", nameComponent);
+                // If there was no valid getter, check for an is- method.
+                if (getter == null) {
+                    getter = findGetter(isStatic, ht, "is", nameComponent);
+                }
+
+                // setter
+                MemberBox setter = null;
+                NativeJavaMethod setters = null;
+                String setterName = "set".concat(nameComponent);
+
+                if (ht.containsKey(setterName)) {
+                    // Is this value a method?
+                    Object member = ht.get(setterName);
+                    if (member instanceof NativeJavaMethod) {
+                        NativeJavaMethod njmSet = (NativeJavaMethod) member;
+                        if (getter != null) {
+                            // We have a getter. Now, do we have a matching
+                            // setter?
+                            Class<?> type = getter.method().getReturnType();
+                            setter = extractSetMethod(type, njmSet.methods, isStatic);
+                        } else {
+                            // No getter, find any set method
+                            setter = extractSetMethod(njmSet.methods, isStatic);
+                        }
+                        if (njmSet.methods.length > 1) {
+                            setters = njmSet;
+                        }
+                    }
+                }
+                if (setter != null && getter != null) {
+                    // Make the property.
+                    BeanProperty bp = new BeanProperty(getter, setter, setters);
+                    toAdd.put(beanPropertyName, bp);
+                    Object object = ht.get(name);
+                    boolean delete = true;
+                    if (object instanceof NativeJavaMethod) {
+                        delete = ((NativeJavaMethod) object).methods.length == 1;
+                    }
+                    if (delete && shouldDeleteGetAndSetMethods()) {
+                        toRemove.add(name);
+                        toRemove.add(setterName);
+                    }
+                }
+            }
+        }
+
+        // Add the new bean properties.
+        ht.putAll(toAdd);
+
+        deleteGetAndSetMethods(isStatic, toRemove);
+    }
 
     protected void deleteGetAndSetMethods(boolean isStatic, List toRemove) {
-		Map<String, Object> ht = (isStatic) ? staticMembers : members;
-		for (Iterator it = toRemove.iterator(); it.hasNext();) {
-			ht.remove(it.next());
-		}
-	}
+        Map<String, Object> ht = isStatic ? staticMembers : members;
+        for (Iterator it = toRemove.iterator(); it.hasNext(); ) {
+            ht.remove(it.next());
+        }
+    }
 
-	/**
-	 * subclasses can override this if they want to delete the get and setters.
-	 */
-	protected boolean shouldDeleteGetAndSetMethods() {
-		return false;
-	}
+    /** subclasses can override this if they want to delete the get and setters. */
+    protected boolean shouldDeleteGetAndSetMethods() {
+        return false;
+    }
 
-	/**
-	 * @param scope
-	 * @param field
-	 */
-	protected void reflectField(Scriptable scope, Field field) {
-		String name = field.getName();
-		int mods = field.getModifiers();
-		try {
-		    boolean isStatic = Modifier.isStatic(mods);
-		    Map<String, Object> ht = isStatic ? staticMembers : members;
-		    Object member = ht.get(name);
-		    if (member == null) {
-		        ht.put(name, field);
-		    } else if (member instanceof NativeJavaMethod) {
-		        NativeJavaMethod method = (NativeJavaMethod) member;
-		        FieldAndMethods fam = new FieldAndMethods(scope, method.methods, field);
-		        Map<String, FieldAndMethods> fmht =
-		                isStatic ? staticFieldAndMethods : fieldAndMethods;
-		        if (fmht == null) {
-		            fmht = new HashMap<String, FieldAndMethods>();
-		            if (isStatic) {
-		                staticFieldAndMethods = fmht;
-		            } else {
-		                fieldAndMethods = fmht;
-		            }
-		        }
-		        fmht.put(name, fam);
-		        ht.put(name, fam);
-		    } else if (member instanceof Field) {
-		        Field oldField = (Field) member;
-		        // If this newly reflected field shadows an inherited field,
-		        // then replace it. Otherwise, since access to the field
-		        // would be ambiguous from Java, no field should be
-		        // reflected.
-		        // For now, the first field found wins, unless another field
-		        // explicitly shadows it.
-		        if (oldField.getDeclaringClass().isAssignableFrom(field.getDeclaringClass())) {
-		            ht.put(name, field);
-		        }
-		    } else {
-		        // "unknown member type"
-		        Kit.codeBug();
-		    }
-		} catch (SecurityException e) {
-		    // skip this field
-		    Context.reportWarning(
-		            "Could not access field "
-		                    + name
-		                    + " of class "
-		                    + cl.getName()
-		                    + " due to lack of privileges.");
-		}
-	}
+    /**
+     * @param scope
+     * @param field
+     */
+    protected void reflectField(Scriptable scope, Field field) {
+        String name = field.getName();
+        int mods = field.getModifiers();
+        try {
+            boolean isStatic = Modifier.isStatic(mods);
+            Map<String, Object> ht = isStatic ? staticMembers : members;
+            Object member = ht.get(name);
+            if (member == null) {
+                ht.put(name, field);
+            } else if (member instanceof NativeJavaMethod) {
+                NativeJavaMethod method = (NativeJavaMethod) member;
+                FieldAndMethods fam = new FieldAndMethods(scope, method.methods, field);
+                Map<String, FieldAndMethods> fmht =
+                        isStatic ? staticFieldAndMethods : fieldAndMethods;
+                if (fmht == null) {
+                    fmht = new HashMap<String, FieldAndMethods>();
+                    if (isStatic) {
+                        staticFieldAndMethods = fmht;
+                    } else {
+                        fieldAndMethods = fmht;
+                    }
+                }
+                fmht.put(name, fam);
+                ht.put(name, fam);
+            } else if (member instanceof Field) {
+                Field oldField = (Field) member;
+                // If this newly reflected field shadows an inherited field,
+                // then replace it. Otherwise, since access to the field
+                // would be ambiguous from Java, no field should be
+                // reflected.
+                // For now, the first field found wins, unless another field
+                // explicitly shadows it.
+                if (oldField.getDeclaringClass().isAssignableFrom(field.getDeclaringClass())) {
+                    ht.put(name, field);
+                }
+            } else {
+                // "unknown member type"
+                Kit.codeBug();
+            }
+        } catch (SecurityException e) {
+            // skip this field
+            Context.reportWarning(
+                    "Could not access field "
+                            + name
+                            + " of class "
+                            + cl.getName()
+                            + " due to lack of privileges.");
+        }
+    }
 
     private Constructor<?>[] getAccessibleConstructors(boolean includePrivate) {
         // The JVM currently doesn't allow changing access on java.lang.Class
@@ -774,8 +769,8 @@ public class JavaMembers {
                 AccessibleObject.setAccessible(cons, true);
 
                 return cons;
-            }  catch (RuntimeException e) {
-          	  // very likely a InaccessibleObjectException we should just ignore this
+            } catch (RuntimeException e) {
+                // very likely a InaccessibleObjectException we should just ignore this
             }
         }
         return cl.getConstructors();
@@ -803,27 +798,28 @@ public class JavaMembers {
         return cl.getFields();
     }
 
-	/**
-	 * @param includePrivate
-	 * @param fieldsList
-	 * @param currentClass
-	 */
-	protected void fillDeclaredFields(boolean includePrivate, List<Field> fieldsList, Class<?> currentClass) {
-		// get all declared fields in this class, make them
-		// accessible, and save
-		Field[] declared = currentClass.getDeclaredFields();
-		for (Field field : declared) {
-		    int mod = field.getModifiers();
-		    if (includePrivate || isPublic(mod) || isProtected(mod)) {
-		    	if (makeAccessible(field, true)) {
-		            fieldsList.add(field);
-		    	}
-		    }
-		}
-		for (Class<?> iface : currentClass.getInterfaces()) {
-			fillDeclaredFields(includePrivate, fieldsList, iface);
-		}
-	}
+    /**
+     * @param includePrivate
+     * @param fieldsList
+     * @param currentClass
+     */
+    protected void fillDeclaredFields(
+            boolean includePrivate, List<Field> fieldsList, Class<?> currentClass) {
+        // get all declared fields in this class, make them
+        // accessible, and save
+        Field[] declared = currentClass.getDeclaredFields();
+        for (Field field : declared) {
+            int mod = field.getModifiers();
+            if (includePrivate || isPublic(mod) || isProtected(mod)) {
+                if (makeAccessible(field, true)) {
+                    fieldsList.add(field);
+                }
+            }
+        }
+        for (Class<?> iface : currentClass.getInterfaces()) {
+            fillDeclaredFields(includePrivate, fieldsList, iface);
+        }
+    }
 
     private static MemberBox findGetter(
             boolean isStatic, Map<String, Object> ht, String prefix, String propertyName) {
@@ -866,18 +862,18 @@ public class JavaMembers {
         for (MemberBox method : methods) {
             if (!isStatic || method.isStatic()) {
                 Class<?>[] params = method.argTypes;
-				if (method.method().getReturnType() == Void.TYPE) {
-					if (params.length == 1) {
-						if (params[0] == type) {
-							// perfect match, no need to continue scanning
-							return method;
-						}
-						if (acceptableMatch == null && params[0].isAssignableFrom(type)) {
-							// do not return at this point, there can still be perfect match
-							acceptableMatch = method;
-						}
-					}
-				}
+                if (method.method().getReturnType() == Void.TYPE) {
+                    if (params.length == 1) {
+                        if (params[0] == type) {
+                            // perfect match, no need to continue scanning
+                            return method;
+                        }
+                        if (acceptableMatch == null && params[0].isAssignableFrom(type)) {
+                            // do not return at this point, there can still be perfect match
+                            acceptableMatch = method;
+                        }
+                    }
+                }
             }
         }
         return acceptableMatch;
@@ -1005,26 +1001,25 @@ public class JavaMembers {
     private Map<String, FieldAndMethods> staticFieldAndMethods;
     NativeJavaMethod ctors; // we use NativeJavaMethod for ctor overload resolution
 
-    public class BeanProperty {
+    public static class BeanProperty {
         public BeanProperty(MemberBox getter, MemberBox setter, NativeJavaMethod setters) {
             this.getter = getter;
             this.setter = setter;
             this.setters = setters;
         }
 
-    	public Method getSetter() {
-    		return setter.method();
-    	}
+        public Method getSetter() {
+            return setter.method();
+        }
 
-    	public Method getGetter() {
-    		return getter.method();
-    	}
-    	
+        public Method getGetter() {
+            return getter.method();
+        }
+
         MemberBox getter;
         MemberBox setter;
         NativeJavaMethod setters;
     }
-
 }
 
 class FieldAndMethods extends NativeJavaMethod {

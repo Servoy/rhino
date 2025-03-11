@@ -2442,11 +2442,10 @@ public class Context implements Closeable {
     }
 
     public final void setApplicationClassLoader(ClassLoader loader) {
-    	setApplicationClassLoader(loader,true);
+        setApplicationClassLoader(loader, true);
     }
-    
-    public final void setApplicationClassLoader(ClassLoader loader, boolean testRhinoClass)
-    {
+
+    public final void setApplicationClassLoader(ClassLoader loader, boolean testRhinoClass) {
         if (sealed) onSealedMutation();
         if (loader == null) {
             // restore default behaviour
@@ -2454,8 +2453,7 @@ public class Context implements Closeable {
             return;
         }
         if (testRhinoClass && !Kit.testIfCanLoadRhinoClasses(loader)) {
-            throw new IllegalArgumentException(
-                "Loader can not resolve Rhino classes");
+            throw new IllegalArgumentException("Loader can not resolve Rhino classes");
         }
         applicationClassLoader = loader;
     }
