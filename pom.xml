@@ -26,6 +26,17 @@
         </repository>
     </repositories>
 	<build>
+        <resources>
+         <resource>
+           <directory>rhino/src/main/resources</directory>
+         </resource>
+        <resource>
+           <directory>rhino-tools/src/main/resources</directory>
+         </resource>
+        <resource>
+           <directory>rhino-xml/src/main/resources</directory>
+         </resource>
+       </resources>
 		<plugins>
 		<plugin>
                         <groupId>org.apache.maven.plugins</groupId>

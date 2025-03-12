@@ -4,6 +4,8 @@
 	<classpathentry kind="src" path="rhino-xml/src/main/java"/>
 	<classpathentry kind="src" path="rhino-tools/src/main/java"/>
 	<classpathentry kind="src" path="rhino/src/main/java"/>
+	<classpathentry kind="src" path="rhino/src/main/resources"/>
+	<classpathentry kind="src" path="rhino-tools/src/main/resources"/>
 	<classpathentry kind="con" path="org.eclipse.jdt.launching.JRE_CONTAINER/org.eclipse.jdt.internal.debug.ui.launcher.StandardVMType/JavaSE-21">
 		<attributes>
 			<attribute name="module" value="true"/>
