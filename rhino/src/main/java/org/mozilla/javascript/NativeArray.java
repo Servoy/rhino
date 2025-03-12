@@ -97,7 +97,12 @@ public class NativeArray extends IdScriptableObject implements List, Wrapper {
         length = array.length;
     }
 
-    @Override
+    // Patch: Added because we want to make sure we are not creating a dense array
+    public NativeArray(boolean b) {
+		denseOnly = false;
+	}
+
+	@Override
     public String getClassName() {
         return "Array";
     }
