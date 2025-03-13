@@ -533,11 +533,13 @@ public class NativeJavaMethod extends BaseFunction {
 
         int totalPreference = 0;
         for (int j = 0; j < args.length; j++) {
-            final var type1 =
+            var type1 =
                     member1.vararg && j >= types1.length ? types1[types1.length - 1] : types1[j];
-            final var type2 =
+            var type2 =
                     member2.vararg && j >= types2.length ? types2[types2.length - 1] : types2[j];
 
+            if (member1.vararg && member2.vararg && j == (types2.length - 1) && type2.isArray()) type2 = type2.getComponentType();
+        	if (member1.vararg && member2.vararg  && j == (types1.length - 1) && type1.isArray()) type1 = type1.getComponentType();
             if (type1 == type2) {
                 continue;
             }
