@@ -45,6 +45,7 @@ public final class NativeDate extends IdScriptableObject implements Wrapper {
     /**
      * @see org.mozilla.javascript.Wrapper#unwrap()
      */
+    @Override
     public Object unwrap() {
         if (originalDate != null) {
             // clone the orignal date so we don't change that, but we do keep the type of the date.

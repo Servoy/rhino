@@ -99,10 +99,10 @@ public class NativeArray extends IdScriptableObject implements List, Wrapper {
 
     // Patch: Added because we want to make sure we are not creating a dense array
     public NativeArray(boolean b) {
-		denseOnly = false;
-	}
+        denseOnly = false;
+    }
 
-	@Override
+    @Override
     public String getClassName() {
         return "Array";
     }
