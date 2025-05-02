@@ -13,6 +13,7 @@ import java.io.Serializable;
 import java.lang.reflect.Array;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
+import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.util.Date;
 import java.util.Iterator;
@@ -285,7 +286,8 @@ public class NativeJavaObject implements Scriptable, SymbolScriptable, Wrapper, 
     private static final int JSTYPE_JAVA_ARRAY = 7; // JavaArray
     private static final int JSTYPE_OBJECT = 8; // Scriptable
     private static final int JSTYPE_BIGINT = 9; // BigInt
-
+    private static final int JSTYPE_BIGDECIMAL = 10; // BigDecimal patch
+    
     static final byte CONVERSION_TRIVIAL = 1;
     static final byte CONVERSION_NONTRIVIAL = 0;
     static final byte CONVERSION_NONE = 99;
@@ -329,6 +331,7 @@ public class NativeJavaObject implements Scriptable, SymbolScriptable, Wrapper, 
 
             case JSTYPE_NUMBER:
             case JSTYPE_BIGINT:
+            case JSTYPE_BIGDECIMAL:
                 if (to.isPrimitive()) {
                     if (to == Double.TYPE) {
                         return 1;
@@ -339,7 +342,7 @@ public class NativeJavaObject implements Scriptable, SymbolScriptable, Wrapper, 
                     if (to == ScriptRuntime.StringClass) {
                         // native numbers are #1-8
                         return 9;
-                    } else if (to == ScriptRuntime.BigIntegerClass) {
+                    } else if (to == ScriptRuntime.BigIntegerClass || to == ScriptRuntime.BigDecimalClass/**BigDecimal patch **/) {
                         return 10;
                     } else if (to == ScriptRuntime.ObjectClass) {
                         return 11;
@@ -475,6 +478,8 @@ public class NativeJavaObject implements Scriptable, SymbolScriptable, Wrapper, 
             return JSTYPE_STRING;
         } else if (value instanceof BigInteger) {
             return JSTYPE_BIGINT;
+        } else if (value instanceof BigDecimal) /**BigDecimal patch **/{
+            return JSTYPE_BIGDECIMAL;
         } else if (value instanceof Number) {
             return JSTYPE_NUMBER;
         } else if (value instanceof Boolean) {
@@ -568,7 +573,7 @@ public class NativeJavaObject implements Scriptable, SymbolScriptable, Wrapper, 
                         }
                     }
                     return coerceToNumber(
-                            jsTypeCode == JSTYPE_BIGINT ? BigInteger.class : Double.TYPE, value);
+                            jsTypeCode == JSTYPE_BIGINT ? BigInteger.class : ( jsTypeCode == JSTYPE_BIGDECIMAL ? BigDecimal.class : Double.TYPE /**BigDecimal patch **/), value);
                 } else if ((type.isPrimitive() && type != Boolean.TYPE)
                         || ScriptRuntime.NumberClass.isAssignableFrom(type)
                         || ScriptRuntime.CharacterClass.isAssignableFrom(type)) {
@@ -757,6 +762,11 @@ public class NativeJavaObject implements Scriptable, SymbolScriptable, Wrapper, 
             return ScriptRuntime.toBigInt(value);
         }
 
+        //BigDecimal patch
+		if (type == BigDecimal.class) {
+			return new BigDecimal(ScriptRuntime.toString(value));
+		}
+		
         if (type == ScriptRuntime.FloatClass || type == Float.TYPE) {
             if (valueClass == ScriptRuntime.FloatClass) {
                 return value;

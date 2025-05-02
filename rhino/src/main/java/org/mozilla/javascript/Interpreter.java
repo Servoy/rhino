@@ -10,6 +10,7 @@ import static org.mozilla.javascript.UniqueTag.DOUBLE_MARK;
 
 import java.io.PrintStream;
 import java.io.Serializable;
+import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
@@ -3110,7 +3111,7 @@ public final class Interpreter extends Icode implements Evaluator {
                 break;
         }
 
-        if (result instanceof BigInteger) {
+        if (result instanceof BigInteger || result instanceof BigDecimal/**BigDecimal patch **/) {
             stack[stackTop] = result;
         } else {
             stack[stackTop] = DOUBLE_MARK;
@@ -3954,7 +3955,10 @@ public final class Interpreter extends Icode implements Evaluator {
                     stack[stackTop] = ((BigInteger) lNum).add((BigInteger) rNum);
                 } else if (lNum instanceof BigInteger || rNum instanceof BigInteger) {
                     throw ScriptRuntime.typeErrorById("msg.cant.convert.to.number", "BigInt");
-                } else {
+                } else if (lNum instanceof BigDecimal || rNum instanceof BigDecimal) {/**BigDecimal patch **/
+                	  stack[stackTop] =  ScriptRuntime.toBigDecimal(lNum).add(ScriptRuntime.toBigDecimal(rNum));
+                }
+                else {
                     stack[stackTop] = DOUBLE_MARK;
                     sDbl[stackTop] = lNum.doubleValue() + rNum.doubleValue();
                 }
@@ -4014,7 +4018,7 @@ public final class Interpreter extends Icode implements Evaluator {
                 break;
         }
 
-        if (result instanceof BigInteger) {
+        if (result instanceof BigInteger || result instanceof BigDecimal) {
             stack[stackTop] = result;
         } else {
             stack[stackTop] = DOUBLE_MARK;
