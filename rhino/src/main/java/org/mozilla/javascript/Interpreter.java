@@ -3123,7 +3123,7 @@ public final class Interpreter extends Icode implements Evaluator {
     private static int doBitNOT(CallFrame frame, Object[] stack, double[] sDbl, int stackTop) {
         Number value = stack_numeric(frame, stackTop);
         Number result = ScriptRuntime.bitwiseNOT(value);
-        if (result instanceof BigInteger) {
+        if (result instanceof BigInteger || result instanceof BigDecimal/**BigDecimal patch **/) {
             stack[stackTop] = result;
         } else {
             stack[stackTop] = DOUBLE_MARK;
@@ -3986,7 +3986,10 @@ public final class Interpreter extends Icode implements Evaluator {
             Number lNum = (lhs instanceof Number) ? (Number) lhs : ScriptRuntime.toNumeric(lhs);
             if (lNum instanceof BigInteger) {
                 throw ScriptRuntime.typeErrorById("msg.cant.convert.to.number", "BigInt");
-            } else {
+			} else if (lNum instanceof BigDecimal) {/** BigDecimal patch **/
+				stack[stackTop] = ScriptRuntime.toBigDecimal(lNum).add(ScriptRuntime.toBigDecimal(d));
+			}
+            else {
                 stack[stackTop] = DOUBLE_MARK;
                 sDbl[stackTop] = lNum.doubleValue() + d;
             }
@@ -4018,7 +4021,7 @@ public final class Interpreter extends Icode implements Evaluator {
                 break;
         }
 
-        if (result instanceof BigInteger || result instanceof BigDecimal) {
+        if (result instanceof BigInteger || result instanceof BigDecimal/**BigDecimal patch **/) {
             stack[stackTop] = result;
         } else {
             stack[stackTop] = DOUBLE_MARK;

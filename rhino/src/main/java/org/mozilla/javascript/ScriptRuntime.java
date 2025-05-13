@@ -815,7 +815,12 @@ public class ScriptRuntime {
 		if (val instanceof BigDecimal) {
 			return (BigDecimal) val;
 		}
-        return new BigDecimal(val.doubleValue());
+        return new BigDecimal(val.doubleValue(), MathContext.DECIMAL64).stripTrailingZeros();
+    }
+    
+    /**BigDecimal patch **/
+    public static BigDecimal toBigDecimal(double val) {
+        return new BigDecimal(val, MathContext.DECIMAL64).stripTrailingZeros();
     }
     
     public static int toIndex(Object val) {
@@ -3544,6 +3549,8 @@ public class ScriptRuntime {
             throw ScriptRuntime.typeErrorById("msg.cant.convert.to.number", "BigInt");
         } else if (val1 instanceof Integer && val2 instanceof Integer) {
             return Integer.valueOf(((Integer) val1).intValue() ^ ((Integer) val2).intValue());
+        } else if (val1 instanceof BigDecimal || val2 instanceof BigDecimal) {/**BigDecimal patch **/
+            return new BigDecimal(ScriptRuntime.toBigDecimal(val1).toBigInteger().xor(ScriptRuntime.toBigDecimal(val2).toBigInteger()));
         } else {
             int result = toInt32(val1.doubleValue()) ^ toInt32(val2.doubleValue());
             return Double.valueOf(result);
@@ -3593,6 +3600,8 @@ public class ScriptRuntime {
     public static Number bitwiseNOT(Number val) {
         if (val instanceof BigInteger) {
             return ((BigInteger) val).not();
+        } else if (val instanceof BigDecimal) {
+                return new BigDecimal(((BigDecimal) val).toBigInteger().not());
         } else if (val instanceof Integer) {
             return Integer.valueOf(~((Integer) val).intValue());
         } else {
