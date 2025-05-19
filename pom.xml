@@ -34,6 +34,9 @@
            <directory>rhino-tools/src/main/resources</directory>
          </resource>
         <resource>
+           <directory>rhino-engine/src/main/resources</directory>
+         </resource>
+        <resource>
            <directory>rhino-xml/src/main/resources</directory>
          </resource>
        </resources>
