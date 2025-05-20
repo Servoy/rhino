@@ -241,7 +241,7 @@ public class NativeJavaMethod extends BaseFunction {
                         }
                     }
                 }
-            } else if (args[i] instanceof Wrapper) {
+            } else if (args[i] instanceof Wrapper && !argTypes[i].isInstance(args[i])) {
                 // in case of varargs (i >= argTypes.length) or method is declared with non-wrapper:
                 // call method with unwrapped
                 if (i >= argTypes.length || !Wrapper.class.isAssignableFrom(argTypes[i])) {
