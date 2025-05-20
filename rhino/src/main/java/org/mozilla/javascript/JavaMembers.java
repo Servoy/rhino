@@ -671,18 +671,20 @@ public class JavaMembers {
                         }
                     }
                 }
-                if (setter != null && getter != null) {
+                if (getter != null) {
                     // Make the property.
                     BeanProperty bp = new BeanProperty(getter, setter, setters);
                     toAdd.put(beanPropertyName, bp);
-                    Object object = ht.get(name);
-                    boolean delete = true;
-                    if (object instanceof NativeJavaMethod) {
-                        delete = ((NativeJavaMethod) object).methods.length == 1;
-                    }
-                    if (delete && shouldDeleteGetAndSetMethods()) {
-                        toRemove.add(name);
-                        toRemove.add(setterName);
+                    if (setter != null) {
+	                    Object object = ht.get(name);
+	                    boolean delete = true;
+	                    if (object instanceof NativeJavaMethod) {
+	                        delete = ((NativeJavaMethod) object).methods.length == 1;
+	                    }
+	                    if (delete && shouldDeleteGetAndSetMethods()) {
+	                        toRemove.add(name);
+	                        toRemove.add(setterName);
+	                    }
                     }
                 }
             }
