@@ -374,10 +374,10 @@ public class FunctionObject extends BaseFunction {
 
             if (parmsLength == VARARGS_METHOD) {
                 Object[] invokeArgs = {cx, thisObj, args, this};
-                if (!member.method().isVarArgs()) {
-                    invokeArgs = new Object[] {args};
-                }
-                result = member.invoke(thisObj, invokeArgs);
+//                if (!member.method().isVarArgs()) {
+//                    invokeArgs = new Object[] {args};
+//                }
+                result = member.invoke(null, invokeArgs);
                 checkMethodResult = true;
             } else {
                 boolean inNewExpr = (thisObj == null);
@@ -386,7 +386,7 @@ public class FunctionObject extends BaseFunction {
                 result =
                         member.isCtor()
                                 ? member.newInstance(invokeArgs)
-                                : member.invoke(thisObj, invokeArgs);
+                                : member.invoke(null, invokeArgs);
             }
 
         } else {
