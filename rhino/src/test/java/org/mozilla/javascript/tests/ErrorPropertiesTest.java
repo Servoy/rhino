@@ -4,10 +4,13 @@
 
 package org.mozilla.javascript.tests;
 
+import org.junit.After;
 import org.junit.Assert;
+import org.junit.Before;
 import org.junit.Test;
 import org.mozilla.javascript.RhinoException;
 import org.mozilla.javascript.ScriptableObject;
+import org.mozilla.javascript.StackStyle;
 import org.mozilla.javascript.testutils.Utils;
 
 /**
@@ -19,6 +22,7 @@ import org.mozilla.javascript.testutils.Utils;
  */
 public class ErrorPropertiesTest {
     static final String LS = System.getProperty("line.separator");
+	private StackStyle stackStyle;
 
     private void testScriptStackTrace(final String script, final String expectedStackTrace) {
         testScriptStackTrace(script, expectedStackTrace, false);
@@ -73,6 +77,16 @@ public class ErrorPropertiesTest {
         testIt(
                 "function f() {\n null.method(); \n}\n try { f() } catch (e) { e.stack }",
                 expectedStack);
+    }
+    
+    @Before
+    public void rememberStackStyle() {
+    	stackStyle = RhinoException.getStackStyle();
+    }
+    
+    @After 
+    public void revertStackStyle() {
+    	RhinoException.setStackStyle(stackStyle);
     }
 
     private void testIt(final String script, final Object expected) {
