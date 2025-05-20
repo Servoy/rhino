@@ -11,6 +11,8 @@ import static org.junit.Assert.fail;
 
 import java.util.Collection;
 import java.util.Map;
+import java.util.function.Supplier;
+
 import org.junit.Test;
 import org.mozilla.javascript.EvaluatorException;
 import org.mozilla.javascript.Scriptable;
@@ -26,8 +28,8 @@ public class OverloadTest {
         return "map";
     }
 
-    public static String x(Runnable r) {
-        return "runnable";
+    public static String xx(Supplier<String> r) {
+        return r.get();
     }
 
     @Test
@@ -41,6 +43,11 @@ public class OverloadTest {
     @Test
     public void jsArrayToCollection() {
         assertEvaluates("collection", "String(org.mozilla.javascript.tests.OverloadTest.x([]));");
+    }
+    
+    @Test
+    public void jsFunctionToRunnableInterface() {
+        assertEvaluates("called", "String(org.mozilla.javascript.tests.OverloadTest.xx(function() {return 'called';}));");
     }
 
     @Test
