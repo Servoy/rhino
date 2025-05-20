@@ -37,8 +37,8 @@ public class NativeJavaObjectTest {
                 Object result = cx.evaluateString(scope, source, "source", 1, null);
                 assertTrue(result instanceof NativeJavaObject);
                 Object rawObj = ((NativeJavaObject) result).unwrap();
-                assertTrue(rawObj instanceof Double);
-                assertEquals(Double.valueOf(123), rawObj);
+                assertTrue(rawObj instanceof Integer); // servoy patched test
+                assertEquals(Integer.valueOf(123), rawObj); 
             }
 
             {
