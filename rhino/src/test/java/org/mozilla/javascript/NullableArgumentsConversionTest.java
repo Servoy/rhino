@@ -20,7 +20,7 @@ public class NullableArgumentsConversionTest {
                 new Object[][] {
                     {"string", JAVA_STRING_TYPE, false, "string"},
                     {"string", JAVA_STRING_TYPE, true, "string"},
-                    {null, JAVA_STRING_TYPE, false, "null"},
+                    {null, JAVA_STRING_TYPE, false, ""}, // servoy patched test we want null to be ""
                     {null, JAVA_STRING_TYPE, true, null},
                     {2, JAVA_INT_TYPE, false, 2},
                     {2, JAVA_INT_TYPE, true, 2},
