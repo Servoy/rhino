@@ -135,7 +135,7 @@ public class NativeArrayTest {
 
             Scriptable scope = cx.initStandardObjects();
             String result = cx.evaluateString(scope, source, "source", 1, null).toString();
-            Assert.assertEquals("0,1,0,1", result);
+            Assert.assertEquals("[[0,1],[0,1]]", result); // servoy patched test, we want [] around arrays
         }
     }
 }

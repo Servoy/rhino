@@ -429,7 +429,7 @@ public class NativeRegExpTest {
                         + "res += regex.exec('ab-c') + '-' + regex.lastIndex\n"
                         + "res;";
 
-        Utils.assertWithAllModes_ES6("a-1-b-2-null-0", script);
+        Utils.assertWithAllModes_ES6("[a,index=0,input=ab-c]-1-[b,index=1,input=ab-c]-2--0", script);  // servoy patch different tosting of the native array
     }
 
     @Test
@@ -441,7 +441,7 @@ public class NativeRegExpTest {
                         + "res += regex.exec('ab-c') + '-' + regex.lastIndex\n"
                         + "res;";
 
-        Utils.assertWithAllModes_ES6("a-1-b-2-null-0", script);
+        Utils.assertWithAllModes_ES6("[a,index=0,input=ab-c]-1-[b,index=1,input=ab-c]-2--0", script); // servoy patch different tosting of the native array
     }
 
     /**

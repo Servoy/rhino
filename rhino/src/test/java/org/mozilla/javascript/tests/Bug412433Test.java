@@ -17,6 +17,6 @@ public class Bug412433Test {
 
     @Test
     public void malformedJavascript2() {
-        Utils.assertWithAllModes("", "'' + \"\".split(/[/?,/&]/)");
+        Utils.assertWithAllModes("[]", "'' + \"\".split(/[/?,/&]/)"); // servoy patch we expect arrays to always have []
     }
 }
