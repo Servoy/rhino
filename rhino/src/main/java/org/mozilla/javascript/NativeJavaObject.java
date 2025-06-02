@@ -520,7 +520,7 @@ public class NativeJavaObject implements Scriptable, SymbolScriptable, Wrapper, 
     static Object coerceTypeImpl(Class<?> type, Object value) {
         if ( (value != null && value.getClass() == type) ||
         		 // a quick test for Wrapper objects that already an instanceof that type 
-        		// like NativeWrapper which is a Wrapper and a List
+        		// like NativeArray which is a Wrapper and a List
         		// so a list should just be directly returned, but don't do this for Object parameter, 
         		// because everything is a type of that. (NativeJavaObject is also an Object) 
         		(!(type instanceof Object) && type.isInstance(value))) {
