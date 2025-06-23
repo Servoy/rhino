@@ -1005,6 +1005,10 @@ public class ScriptRuntime {
             if (val instanceof BigInteger) {
                 return ((BigInteger) val).toString(10);
             }
+            // bigdecimal patch
+            if (val instanceof BigDecimal) {
+                return ((BigDecimal) val).toString();
+            }
             if (val instanceof Number) {
                 // XXX should we just teach NativeNumber.stringValue()
                 // about Numbers?
