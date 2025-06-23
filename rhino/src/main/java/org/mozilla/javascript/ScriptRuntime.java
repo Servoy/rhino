@@ -1005,7 +1005,7 @@ public class ScriptRuntime {
             if (val instanceof BigInteger) {
                 return ((BigInteger) val).toString(10);
             }
-            // bigdecimal patch
+            /**BigDecimal patch **/
             if (val instanceof BigDecimal) {
                 return ((BigDecimal) val).toString();
             }
