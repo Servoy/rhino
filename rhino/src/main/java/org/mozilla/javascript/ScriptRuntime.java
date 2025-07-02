@@ -12,6 +12,7 @@ import java.lang.reflect.Constructor;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.math.MathContext;
+import java.math.RoundingMode;
 import java.text.MessageFormat;
 import java.util.Arrays;
 import java.util.Date;
@@ -3445,7 +3446,7 @@ public class ScriptRuntime {
         } else if (val1 instanceof BigInteger || val2 instanceof BigInteger) {
             throw ScriptRuntime.typeErrorById("msg.cant.convert.to.number", "BigInt");
         } else if (val1 instanceof BigDecimal || val2 instanceof BigDecimal) {/**BigDecimal patch **/
-        	return ScriptRuntime.toBigDecimal(val1).divide(ScriptRuntime.toBigDecimal(val2));
+        	return ScriptRuntime.toBigDecimal(val1).divide(ScriptRuntime.toBigDecimal(val2), 16, RoundingMode.HALF_UP).stripTrailingZeros();
         } else {
             // Do not try to optimize for the integer case because JS doesn't
             // have an integer type.
