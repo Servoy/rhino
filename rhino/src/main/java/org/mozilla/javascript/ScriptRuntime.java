@@ -5422,20 +5422,27 @@ public class ScriptRuntime {
     }
 
     public static RuntimeException undefReadError(Object object, Object id) {
-        return typeErrorById("msg.undef.prop.read", toString(object), toString(id));
+        return typeErrorById("msg.undef.prop.read", toStringReturnNull(object), toStringReturnNull(id));
     }
 
     public static RuntimeException undefCallError(Object object, Object id) {
-        return typeErrorById("msg.undef.method.call", toString(object), toString(id));
+        return typeErrorById("msg.undef.method.call", toStringReturnNull(object), toStringReturnNull(id));
     }
 
     public static RuntimeException undefWriteError(Object object, Object id, Object value) {
         return typeErrorById(
-                "msg.undef.prop.write", toString(object), toString(id), toString(value));
+                "msg.undef.prop.write", toStringReturnNull(object), toStringReturnNull(id), toStringReturnNull(value));
     }
 
     private static RuntimeException undefDeleteError(Object object, Object id) {
-        throw typeErrorById("msg.undef.prop.delete", toString(object), toString(id));
+        throw typeErrorById("msg.undef.prop.delete", toStringReturnNull(object), toStringReturnNull(id));
+    }
+    
+    private static String toStringReturnNull(Object object) {
+    	if (object == null) {
+    		return "null";
+    	}
+    	return toString(object);
     }
 
     public static RuntimeException notFoundError(Scriptable object, String property) {
@@ -5459,7 +5466,7 @@ public class ScriptRuntime {
 
     public static RuntimeException notFunctionError(Object obj, Object value, String propertyName) {
         // Use obj and value for better error reporting
-        String objString = toString(obj);
+        String objString = toStringReturnNull(obj);
         if (obj instanceof NativeFunction) {
             // Omit function body in string representations of functions
             int paren = objString.indexOf(')');
@@ -5475,7 +5482,7 @@ public class ScriptRuntime {
     }
 
     private static RuntimeException notXmlError(Object value) {
-        throw typeErrorById("msg.isnt.xml.object", toString(value));
+        throw typeErrorById("msg.isnt.xml.object", toStringReturnNull(value));
     }
 
     public static EcmaError syntaxError(String message) {
