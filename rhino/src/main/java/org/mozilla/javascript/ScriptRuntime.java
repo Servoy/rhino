@@ -1285,15 +1285,8 @@ public class ScriptRuntime {
             setBuiltinProtoAndParent(result, scope, TopLevel.Builtins.BigInt);
             return result;
         }
-		if (val instanceof BigDecimal) { /** BigDecimal patch **/
-			// we call wrapAsJavaObject to ensure that BigDecimal is wrapped as a Scriptable
-			// object, we can't use wrap() directly here because that would just return itself
-			Object wrapped = cx.getWrapFactory().wrapAsJavaObject(cx, scope, val, BigDecimal.class);
-			if (wrapped instanceof Scriptable)
-				return (Scriptable) wrapped;
-		}
         if (val instanceof Number) {
-            NativeNumber result = new NativeNumber(((Number) val).doubleValue());
+            NativeNumber result = new NativeNumber((Number) val);
             setBuiltinProtoAndParent(result, scope, TopLevel.Builtins.Number);
             return result;
         }
@@ -4322,8 +4315,7 @@ public class ScriptRuntime {
         if (a == null || a == Undefined.instance) return false;
 
 		if (a instanceof BigDecimal bd) {/** BigDecimal patch **/
-			// toObject below will return a NativeJavaObject (for calling toString and so on)
-			NativeNumber result = new NativeNumber(bd.doubleValue());
+			NativeNumber result = new NativeNumber(bd);
 			setBuiltinProtoAndParent(result, cx.topCallScope, TopLevel.Builtins.Number);
 			a = result;
 		}

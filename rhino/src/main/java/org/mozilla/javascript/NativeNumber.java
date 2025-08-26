@@ -6,6 +6,8 @@
 
 package org.mozilla.javascript;
 
+import java.math.BigDecimal;
+
 /**
  * This class implements the Number native object.
  *
@@ -27,7 +29,7 @@ final class NativeNumber extends ScriptableObject {
     private static final double MIN_SAFE_INTEGER = -MAX_SAFE_INTEGER;
     private static final double EPSILON = 2.220446049250313e-16;
 
-    private final double doubleValue;
+    private final Number doubleValue;
 
     static void init(Scriptable scope, boolean sealed) {
         LambdaConstructor constructor =
@@ -123,7 +125,7 @@ final class NativeNumber extends ScriptableObject {
         }
     }
 
-    NativeNumber(double number) {
+    NativeNumber(Number number) {
         doubleValue = number;
     }
 
@@ -145,13 +147,23 @@ final class NativeNumber extends ScriptableObject {
     private static Object js_toFixed(
             Context cx, Scriptable scope, Scriptable thisObj, Object[] args) {
         int precisionMin = cx.version < Context.VERSION_ES6 ? -20 : 0;
-        double value = toSelf(thisObj).doubleValue;
+        /**BigDecimal patch **/
+        Number numberValue = toSelf(thisObj).doubleValue;
+        if (numberValue instanceof BigDecimal bigDecimalValue) {
+        	return bigDecimalValue.toPlainString();
+        }
+        double value = numberValue.doubleValue();
         return num_to(value, args, DToA.DTOSTR_FIXED, DToA.DTOSTR_FIXED, precisionMin, 0);
     }
 
     private static Object js_toExponential(
             Context cx, Scriptable scope, Scriptable thisObj, Object[] args) {
-        double value = toSelf(thisObj).doubleValue;
+    	Number numberValue = toSelf(thisObj).doubleValue;
+    	/**BigDecimal patch **/
+    	if (numberValue instanceof BigDecimal bigDecimalValue) {
+        	return bigDecimalValue.toEngineeringString();
+        }
+    	double value = numberValue.doubleValue();
         // Handle special values before range check
         if (Double.isNaN(value)) {
             return "NaN";
@@ -168,7 +180,18 @@ final class NativeNumber extends ScriptableObject {
 
     private static Object js_toPrecision(
             Context cx, Scriptable scope, Scriptable thisObj, Object[] args) {
-        double value = toSelf(thisObj).doubleValue;
+        Number numberValue = toSelf(thisObj).doubleValue;
+        /**BigDecimal patch **/
+		if (numberValue instanceof BigDecimal bigDecimalValue) {
+			 String stringValue = bigDecimalValue.toPlainString();
+		     if (args.length == 0 || Undefined.isUndefined(args[0])) {
+		        return stringValue;
+		     }
+		     else {
+		        return stringValue.substring(0, new Double( ScriptRuntime.toInteger(args[0])).intValue());
+		     }
+		}
+		double value = numberValue.doubleValue();
         // Undefined precision, fall back to ToString()
         if (args.length == 0 || Undefined.isUndefined(args[0])) {
             return ScriptRuntime.numberToString(value, 10);
@@ -196,7 +219,9 @@ final class NativeNumber extends ScriptableObject {
                 (args.length == 0 || Undefined.isUndefined(args[0]))
                         ? 10
                         : ScriptRuntime.toInt32(args[0]);
-        return ScriptRuntime.numberToString(toSelf(thisObj).doubleValue, base);
+        /**BigDecimal patch **/
+        Number numberValue = toSelf(thisObj).doubleValue;
+        return numberValue instanceof BigDecimal ? ScriptRuntime.toString(numberValue) : ScriptRuntime.numberToString(numberValue.doubleValue(), base);
     }
 
     private static Object js_toSource(
@@ -215,7 +240,8 @@ final class NativeNumber extends ScriptableObject {
 
     @Override
     public String toString() {
-        return ScriptRuntime.numberToString(doubleValue, 10);
+    	/**BigDecimal patch **/
+        return doubleValue instanceof BigDecimal ? ScriptRuntime.toString(doubleValue) : ScriptRuntime.numberToString(doubleValue.doubleValue(), 10);
     }
 
     private static String num_to(
