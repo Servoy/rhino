@@ -565,6 +565,7 @@ public class NativeJavaObject implements Scriptable, SymbolScriptable, Wrapper, 
 
             case JSTYPE_NUMBER:
             case JSTYPE_BIGINT:
+            case JSTYPE_BIGDECIMAL: /**BigDecimal patch **/
                 if (type == ScriptRuntime.StringClass) {
                     return ScriptRuntime.toString(value);
                 } else if (type == ScriptRuntime.ObjectClass) {
