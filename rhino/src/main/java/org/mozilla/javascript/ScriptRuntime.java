@@ -3446,6 +3446,13 @@ public class ScriptRuntime {
         } else if (val1 instanceof BigInteger || val2 instanceof BigInteger) {
             throw ScriptRuntime.typeErrorById("msg.cant.convert.to.number", "BigInt");
         } else if (val1 instanceof BigDecimal || val2 instanceof BigDecimal) {/**BigDecimal patch **/
+        	// do not throw error, same behavior as double division
+        	if (val2.doubleValue() == 0.0d) {
+        		if (val1.doubleValue() == 0.0d) {
+        			return Double.NaN;
+        		}
+                return val1.doubleValue() > 0 ? Double.POSITIVE_INFINITY : Double.NEGATIVE_INFINITY;
+            }
         	return ScriptRuntime.toBigDecimal(val1).divide(ScriptRuntime.toBigDecimal(val2), 16, RoundingMode.HALF_UP).stripTrailingZeros();
         } else {
             // Do not try to optimize for the integer case because JS doesn't
