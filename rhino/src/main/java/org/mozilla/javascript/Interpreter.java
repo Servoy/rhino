@@ -3955,7 +3955,7 @@ public final class Interpreter extends Icode implements Evaluator {
                     stack[stackTop] = ((BigInteger) lNum).add((BigInteger) rNum);
                 } else if (lNum instanceof BigInteger || rNum instanceof BigInteger) {
                     throw ScriptRuntime.typeErrorById("msg.cant.convert.to.number", "BigInt");
-                } else if (lNum instanceof BigDecimal || rNum instanceof BigDecimal) {/**BigDecimal patch **/
+                } else if ((lNum instanceof BigDecimal || rNum instanceof BigDecimal) && ScriptRuntime.isValidBigDecimal(lNum) && ScriptRuntime.isValidBigDecimal(rNum)) {/**BigDecimal patch **/
                 	  stack[stackTop] =  ScriptRuntime.toBigDecimal(lNum).add(ScriptRuntime.toBigDecimal(rNum));
                 }
                 else {

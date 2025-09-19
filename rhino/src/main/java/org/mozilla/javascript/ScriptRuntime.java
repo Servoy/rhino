@@ -813,15 +813,27 @@ public class ScriptRuntime {
 
     /**BigDecimal patch **/
     public static BigDecimal toBigDecimal(Number val) {
-		if (val instanceof BigDecimal) {
-			return (BigDecimal) val;
-		}
+        if (val instanceof BigDecimal) {
+            return (BigDecimal) val;
+        }
         return new BigDecimal(val.doubleValue(), MathContext.DECIMAL64).stripTrailingZeros();
     }
     
     /**BigDecimal patch **/
     public static BigDecimal toBigDecimal(double val) {
         return new BigDecimal(val, MathContext.DECIMAL64).stripTrailingZeros();
+    }
+    
+    /**BigDecimal patch **/
+    public static boolean isValidBigDecimal(Number val) {
+        if (val instanceof BigDecimal) {
+            return true;
+        }
+        double d = val.doubleValue();
+        if (Double.isNaN(d) || Double.isInfinite(d)) {
+           return false;
+        }
+        return true;
     }
     
     public static int toIndex(Object val) {
@@ -3416,7 +3428,7 @@ public class ScriptRuntime {
             throw ScriptRuntime.typeErrorById("msg.cant.convert.to.number", "BigInt");
         } else if (val1 instanceof Integer && val2 instanceof Integer) {
             return subtract((Integer) val1, (Integer) val2);
-        }else if (val1 instanceof BigDecimal || val2 instanceof BigDecimal) {/**BigDecimal patch **/
+        }else if ((val1 instanceof BigDecimal || val2 instanceof BigDecimal) && ScriptRuntime.isValidBigDecimal(val1) && ScriptRuntime.isValidBigDecimal(val2)) {/**BigDecimal patch **/
         	return ScriptRuntime.toBigDecimal(val1).subtract(ScriptRuntime.toBigDecimal(val2));
         }else {
             return val1.doubleValue() - val2.doubleValue();
@@ -3430,7 +3442,7 @@ public class ScriptRuntime {
             throw ScriptRuntime.typeErrorById("msg.cant.convert.to.number", "BigInt");
         } else if (val1 instanceof Integer && val2 instanceof Integer) {
             return multiply((Integer) val1, (Integer) val2);
-        } else if (val1 instanceof BigDecimal || val2 instanceof BigDecimal) {/**BigDecimal patch **/
+        } else if ((val1 instanceof BigDecimal || val2 instanceof BigDecimal) && ScriptRuntime.isValidBigDecimal(val1) && ScriptRuntime.isValidBigDecimal(val2)) {/**BigDecimal patch **/
         	return ScriptRuntime.toBigDecimal(val1).multiply(ScriptRuntime.toBigDecimal(val2));
         } else {
             return val1.doubleValue() * val2.doubleValue();
@@ -3445,7 +3457,7 @@ public class ScriptRuntime {
             return ((BigInteger) val1).divide((BigInteger) val2);
         } else if (val1 instanceof BigInteger || val2 instanceof BigInteger) {
             throw ScriptRuntime.typeErrorById("msg.cant.convert.to.number", "BigInt");
-        } else if (val1 instanceof BigDecimal || val2 instanceof BigDecimal) {/**BigDecimal patch **/
+        } else if ((val1 instanceof BigDecimal || val2 instanceof BigDecimal) && ScriptRuntime.isValidBigDecimal(val1) && ScriptRuntime.isValidBigDecimal(val2)) {/**BigDecimal patch **/
         	// do not throw error, same behavior as double division
         	if (val2.doubleValue() == 0.0d) {
         		if (val1.doubleValue() == 0.0d) {
@@ -3469,7 +3481,7 @@ public class ScriptRuntime {
             return ((BigInteger) val1).remainder((BigInteger) val2);
         } else if (val1 instanceof BigInteger || val2 instanceof BigInteger) {
             throw ScriptRuntime.typeErrorById("msg.cant.convert.to.number", "BigInt");
-        } else if (val1 instanceof BigDecimal || val2 instanceof BigDecimal) {/**BigDecimal patch **/
+        } else if ((val1 instanceof BigDecimal || val2 instanceof BigDecimal) && ScriptRuntime.isValidBigDecimal(val1) && ScriptRuntime.isValidBigDecimal(val2)) {/**BigDecimal patch **/
         	return ScriptRuntime.toBigDecimal(val1).remainder(ScriptRuntime.toBigDecimal(val2));
         } else {
             // Do not try an integer-specific optimization because we need to get
@@ -3561,7 +3573,7 @@ public class ScriptRuntime {
             throw ScriptRuntime.typeErrorById("msg.cant.convert.to.number", "BigInt");
         } else if (val1 instanceof Integer && val2 instanceof Integer) {
             return Integer.valueOf(((Integer) val1).intValue() ^ ((Integer) val2).intValue());
-        } else if (val1 instanceof BigDecimal || val2 instanceof BigDecimal) {/**BigDecimal patch **/
+        } else if ((val1 instanceof BigDecimal || val2 instanceof BigDecimal) && ScriptRuntime.isValidBigDecimal(val1) && ScriptRuntime.isValidBigDecimal(val2)) {/**BigDecimal patch **/
             return new BigDecimal(ScriptRuntime.toBigDecimal(val1).toBigInteger().xor(ScriptRuntime.toBigDecimal(val2).toBigInteger()));
         } else {
             int result = toInt32(val1.doubleValue()) ^ toInt32(val2.doubleValue());
@@ -4420,7 +4432,7 @@ public class ScriptRuntime {
 
         if (val1 instanceof BigInteger && val2 instanceof BigInteger) {
             return compareTo((BigInteger) val1, (BigInteger) val2, op);
-        } else if (val1 instanceof BigDecimal || val2 instanceof BigDecimal) {/**BigDecimal patch **/
+        } else if ((val1 instanceof BigDecimal || val2 instanceof BigDecimal) && ScriptRuntime.isValidBigDecimal(val1) && ScriptRuntime.isValidBigDecimal(val2)) {/**BigDecimal patch **/
         	return compareTo(toBigDecimal(val1), toBigDecimal(val2), op);
         }
         else if (val1 instanceof BigInteger || val2 instanceof BigInteger) {
