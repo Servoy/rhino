@@ -1020,7 +1020,7 @@ public class ScriptRuntime {
             }
             /**BigDecimal patch **/
             if (val instanceof BigDecimal) {
-                return ((BigDecimal) val).toString();
+                return ((BigDecimal) val).stripTrailingZeros().toPlainString();
             }
             if (val instanceof Number) {
                 // XXX should we just teach NativeNumber.stringValue()
