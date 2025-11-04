@@ -1,8 +1,13 @@
 package org.eclipse.dltk.rhino.dbgp;
 
+import java.util.Deque;
+import java.util.HashMap;
+import java.util.Map;
+
 import org.mozilla.javascript.Context;
 import org.mozilla.javascript.NativeArray;
 import org.mozilla.javascript.NativeJavaArray;
+import org.mozilla.javascript.NativeWith;
 import org.mozilla.javascript.Scriptable;
 import org.mozilla.javascript.ScriptableObject;
 import org.mozilla.javascript.debug.DebugFrame;
@@ -10,6 +15,8 @@ import org.mozilla.javascript.debug.DebuggableScript;
 import org.mozilla.javascript.debug.Debugger;
 
 public class DBGPDebugFrame implements DebugFrame {
+
+	private final Deque<NativeWith> nativeWith = new java.util.ArrayDeque<>();
 
     private final String sourceName;
     private final DBGPStackManager stackManager;
@@ -20,6 +27,7 @@ public class DBGPDebugFrame implements DebugFrame {
     private DebuggableScript script;
     private boolean suspend;
     private boolean callOnEnter;
+    
 
     public boolean isSuspend() {
         return suspend;
@@ -109,6 +117,20 @@ public class DBGPDebugFrame implements DebugFrame {
             stackManager.changeLine(this, lineNumber);
         }
     }
+    
+    @Override
+    public void onNativeWithEnter(Context cx, NativeWith withScope) {
+    	nativeWith.push(withScope);
+    	
+    }
+    
+    @Override
+    public void onNativeWithExit(Context cx, NativeWith withScope) {
+    	NativeWith pop = nativeWith.pop();
+    	if (pop != withScope) {
+			throw new IllegalStateException("Popped scope is different from exited one");
+		}
+    }
 
     public String getSourceName() {
         return sourceName;
@@ -159,6 +181,9 @@ public class DBGPDebugFrame implements DebugFrame {
         try {
             context.setDebugger(null, null);
             Scriptable cs = scope;
+            if (nativeWith.size() > 0) {
+				cs = nativeWith.peek();
+			}
             if (value.startsWith("this.")) {
 
                 value = value.substring("this.".length());
