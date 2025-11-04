@@ -9,6 +9,7 @@
 package org.mozilla.javascript.debug;
 
 import org.mozilla.javascript.Context;
+import org.mozilla.javascript.NativeWith;
 import org.mozilla.javascript.Scriptable;
 
 /**
@@ -61,4 +62,8 @@ public interface DebugFrame {
      * @param cx current Context for this thread
      */
     public void onDebuggerStatement(Context cx);
+    
+    public void onNativeWithEnter(Context cx, NativeWith withScope);
+    
+    public void onNativeWithExit(Context cx, NativeWith withScope);
 }

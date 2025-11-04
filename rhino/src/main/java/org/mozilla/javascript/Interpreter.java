@@ -2221,11 +2221,19 @@ public final class Interpreter extends Icode implements Evaluator {
                                         lhs = ScriptRuntime.wrapNumber(sDbl[stackTop]);
                                     --stackTop;
                                     frame.scope = ScriptRuntime.enterWith(lhs, cx, frame.scope);
+                                    if (frame.debuggerFrame != null) {
+										frame.debuggerFrame.onNativeWithEnter(cx, (NativeWith) frame.scope);
+									}
                                     continue Loop;
                                 }
                             case Token.LEAVEWITH:
-                                frame.scope = ScriptRuntime.leaveWith(frame.scope);
-                                continue Loop;
+                            	{
+                                	if (frame.debuggerFrame != null) {
+										frame.debuggerFrame.onNativeWithExit(cx, (NativeWith) frame.scope);
+                                	}
+	                                frame.scope = ScriptRuntime.leaveWith(frame.scope);
+	                                continue Loop;
+                                }
                             case Token.CATCH_SCOPE:
                                 {
                                     // stack top: exception object

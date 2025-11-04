@@ -24,6 +24,7 @@ import org.mozilla.javascript.ContextFactory;
 import org.mozilla.javascript.ImporterTopLevel;
 import org.mozilla.javascript.Kit;
 import org.mozilla.javascript.NativeCall;
+import org.mozilla.javascript.NativeWith;
 import org.mozilla.javascript.ScriptRuntime;
 import org.mozilla.javascript.Scriptable;
 import org.mozilla.javascript.ScriptableObject;
@@ -1035,6 +1036,16 @@ public class Dim {
                 dim.handleBreakpointHit(this, cx);
             }
             contextData.popFrame();
+        }
+        
+        @Override
+        public void onNativeWithEnter(Context cx, NativeWith withScope) {
+        	// ignore for now
+        }
+        
+        @Override
+        public void onNativeWithExit(Context cx, NativeWith withScope) {
+        	// ignore for now
         }
 
         /** Called when a 'debugger' statement is executed. */
