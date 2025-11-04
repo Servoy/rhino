@@ -46,10 +46,8 @@ final class ContextGetCommand extends DBGPDebugger.Command {
                 sendAllIds(properties, stackFrame, scriptable.getParentScope(), doubles, true);
             }
             if (context == LOCAL_CONTEXT_ID || context == -1) {
-                String[] propertyIds = stackFrame.getParametersAndVars();
-                for (int a = 0; a < propertyIds.length; a++) {
-                    String id = propertyIds[a].toString();
-                    Object value = stackFrame.getValue(a);
+                Map<String, Object> varValues = stackFrame.getParametersAndVars();
+                varValues.forEach((id, value) -> {
                     if (!(value instanceof Function)
                             || (value instanceof XMLObject)) // HACK because
                     // ShowFunctionsAction
@@ -62,7 +60,7 @@ final class ContextGetCommand extends DBGPDebugger.Command {
                     {
                         this.debugger.printProperty(id, id, value, properties, 0, true);
                     }
-                }
+                });
 
                 Object argsValue = stackFrame.getStackFrameArgs();
                 if (argsValue != null) {

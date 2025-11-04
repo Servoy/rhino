@@ -39,13 +39,40 @@ public class DBGPDebugFrame implements DebugFrame {
         }
     }
 
-    public String[] getParametersAndVars() {
-        String[] result = new String[script.getParamAndVarCount()];
-        for (int a = 0; a < result.length; a++) {
-            result[a] = script.getParamOrVarName(a);
-        }
-        return result;
-    }
+	public Map<String,Object> getParametersAndVars() {
+		Map<String,Object> paramsAndVars = new HashMap<>();
+		for (int a = 0; a < script.getParamAndVarCount(); a++) {
+			String name = script.getParamOrVarName(a);
+			paramsAndVars.put(name, scope.get(name, thisObj));
+		}
+		DebuggableScript ds = this.script;
+		Scriptable sc = scope;
+		while (!ds.isTopLevel() && ds.getParent() != null) {
+			DebuggableScript parent = ds.getParent();
+			sc = sc.getParentScope();
+			while (sc instanceof NativeWith) {
+				for (Object id : sc.getIds()) {
+					paramsAndVars.put(id.toString(), sc.get(id.toString(),sc));
+				}
+				sc = sc.getParentScope();
+			}
+			for (int a = 0; a < parent.getParamAndVarCount(); a++) {
+				String name = parent.getParamOrVarName(a);
+				paramsAndVars.put(name, sc.get(name, sc));
+			}
+			ds = parent;
+		}
+		if (nativeWith.size() > 0) {
+			Scriptable withScope = nativeWith.peek();
+			while (withScope instanceof NativeWith) {
+				for (Object id : withScope.getIds()) {
+					paramsAndVars.put(id.toString(), withScope.get(id.toString(),withScope));
+				}
+				withScope = withScope.getParentScope();
+			}
+		}
+		return paramsAndVars;
+	}
 
     @Override
     public void onDebuggerStatement(Context cx) {
@@ -102,11 +129,6 @@ public class DBGPDebugFrame implements DebugFrame {
      */
     public String getWhere() {
         return sourceName + "." + where;
-    }
-
-    public Object getValue(int num) {
-        Object object = scope.get(script.getParamOrVarName(num), thisObj);
-        return object;
     }
 
     public Object getStackFrameArgs() {
