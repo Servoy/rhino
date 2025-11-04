@@ -536,7 +536,7 @@ public class DBGPDebugger extends Thread implements Debugger, IDebuggerWithWatch
         if (property instanceof NativeJavaMethod) return false;
         if (property instanceof Function) {
             Function function = (Function) property;
-            Object methodNameObj = function.get("_methodname_", function);
+            Object methodNameObj = function.has("_methodname_", function)?function.get("_methodname_", function):null;
             return (methodNameObj == null || methodNameObj.equals(Scriptable.NOT_FOUND))
                     ? true
                     : false;
