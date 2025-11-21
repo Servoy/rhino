@@ -12,11 +12,15 @@ import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Deque;
 import java.util.List;
+import java.util.Map.Entry;
+
 import org.mozilla.javascript.ast.FunctionNode;
 import org.mozilla.javascript.ast.Jump;
 import org.mozilla.javascript.ast.Name;
 import org.mozilla.javascript.ast.Scope;
 import org.mozilla.javascript.ast.ScriptNode;
+import org.mozilla.javascript.ast.Symbol;
+import org.mozilla.javascript.ast.VariableDeclaration;
 
 /**
  * This class transforms a tree to a lower-level representation for codegen.
@@ -94,9 +98,14 @@ public class NodeTransformer {
                     // created to contain scoped let variables
                     Node let = new Node(type == Token.ARRAYCOMP ? Token.LETEXPR : Token.LET);
                     Node innerLet = new Node(Token.LET);
+                    Node innerConst = new Node(Token.CONST);
                     let.addChildToBack(innerLet);
-                    for (String name : newScope.getSymbolTable().keySet()) {
-                        innerLet.addChildToBack(Node.newString(Token.NAME, name));
+                    let.addChildToBack(innerConst);
+                    for (Entry<String, Symbol> entry : newScope.getSymbolTable().entrySet()) {
+                    	if (entry.getValue().getDeclType() == Token.CONST)
+							innerConst.addChildToBack(Node.newString(Token.NAME, entry.getKey()));
+                    	else 
+                    		innerLet.addChildToBack(Node.newString(Token.NAME, entry.getKey()));
                     }
                     newScope.setSymbolTable(null); // so we don't transform again
                     Node oldNode = node;
@@ -436,7 +445,18 @@ public class NodeTransformer {
 
     protected Node visitLet(boolean createWith, Node parent, Node previous, Node scopeNode) {
         Node vars = scopeNode.getFirstChild();
-        Node body = vars.getNext();
+        Node consts  = null;
+        Node body = null;
+        // you can get here with a variable decl right in the for loop 
+        // or let/const inside the block
+        if (!(vars instanceof VariableDeclaration)) {
+        	consts  = vars.getNext();
+        	body = consts.getNext();
+        	scopeNode.removeChild(consts);
+        }
+        else {
+        	body = vars.getNext();
+        }
         scopeNode.removeChild(vars);
         scopeNode.removeChild(body);
         boolean isExpression = scopeNode.getType() == Token.LETEXPR;
@@ -448,36 +468,10 @@ public class NodeTransformer {
             ArrayList<Object> list = new ArrayList<>();
             Node objectLiteral = new Node(Token.OBJECTLIT);
             for (Node v = vars.getFirstChild(); v != null; v = v.getNext()) {
-                Node current = v;
-                if (current.getType() == Token.LETEXPR) {
-                    // destructuring in let expr, e.g. let ([x, y] = [3, 4]) {}
-                    List<?> destructuringNames =
-                            (List<?>) current.getProp(Node.DESTRUCTURING_NAMES);
-                    Node c = current.getFirstChild();
-                    if (c.getType() != Token.LET) throw Kit.codeBug();
-                    // Add initialization code to front of body
-                    if (isExpression) {
-                        body = new Node(Token.COMMA, c.getNext(), body);
-                    } else {
-                        body = new Node(Token.BLOCK, new Node(Token.EXPR_VOID, c.getNext()), body);
-                    }
-                    // Update "list" and "objectLiteral" for the variables
-                    // defined in the destructuring assignment
-                    if (destructuringNames != null) {
-                        list.addAll(destructuringNames);
-                        for (int i = 0; i < destructuringNames.size(); i++) {
-                            objectLiteral.addChildToBack(new Node(Token.VOID, Node.newNumber(0.0)));
-                        }
-                    }
-                    current = c.getFirstChild(); // should be a NAME, checked below
-                }
-                if (current.getType() != Token.NAME) throw Kit.codeBug();
-                list.add(ScriptRuntime.getIndexObject(current.getString()));
-                Node init = current.getFirstChild();
-                if (init == null) {
-                    init = new Node(Token.VOID, Node.newNumber(0.0));
-                }
-                objectLiteral.addChildToBack(init);
+                body = fillObjectLiterals(body, isExpression, list, objectLiteral, v, false);
+            }
+            if (consts != null) for (Node v = consts.getFirstChild(); v != null; v = v.getNext()) {
+                body = fillObjectLiterals(body, isExpression, list, objectLiteral, v, true);
             }
             objectLiteral.putProp(Node.OBJECT_IDS_PROP, list.toArray());
             newVars = new Node(Token.ENTERWITH, objectLiteral);
@@ -538,6 +532,50 @@ public class NodeTransformer {
         return result;
     }
 
+	/**
+	 * @param body
+	 * @param isExpression
+	 * @param list
+	 * @param objectLiteral
+	 * @param v
+	 * @return
+	 */
+	public Node fillObjectLiterals(Node body, boolean isExpression, ArrayList<Object> list, Node objectLiteral,
+			Node v, boolean forConst) {
+		Node current = v;
+		if (current.getType() == Token.LETEXPR) {
+		    // destructuring in let expr, e.g. let ([x, y] = [3, 4]) {}
+		    List<?> destructuringNames =
+		            (List<?>) current.getProp(Node.DESTRUCTURING_NAMES);
+		    Node c = current.getFirstChild();
+		    if (c.getType() != Token.LET) throw Kit.codeBug();
+		    // Add initialization code to front of body
+		    if (isExpression) {
+		        body = new Node(Token.COMMA, c.getNext(), body);
+		    } else {
+		        body = new Node(Token.BLOCK, new Node(Token.EXPR_VOID, c.getNext()), body);
+		    }
+		    // Update "list" and "objectLiteral" for the variables
+		    // defined in the destructuring assignment
+		    if (destructuringNames != null) {
+		        list.addAll(destructuringNames);
+		        for (int i = 0; i < destructuringNames.size(); i++) {
+		            objectLiteral.addChildToBack(new Node(Token.VOID, Node.newNumber(0.0)));
+		        }
+		    }
+		    current = c.getFirstChild(); // should be a NAME, checked below
+		}
+		if (current.getType() != Token.NAME) throw Kit.codeBug();
+		Object indexObject = ScriptRuntime.getIndexObject(current.getString());
+		list.add(new IndexObject(indexObject, forConst?Token.CONST:Token.LET));
+		Node init = current.getFirstChild();
+		if (init == null) {
+		    init = new Node(Token.VOID, Node.newNumber(0.0));
+		}
+		objectLiteral.addChildToBack(init);
+		return body;
+	}
+	
     private static Node addBeforeCurrent(Node parent, Node previous, Node current, Node toAdd) {
         if (previous == null) {
             if (!(current == parent.getFirstChild())) Kit.codeBug();

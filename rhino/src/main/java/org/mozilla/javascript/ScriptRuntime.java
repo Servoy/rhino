@@ -5146,6 +5146,12 @@ public class ScriptRuntime {
         int end = propertyIds == null ? 0 : propertyIds.length;
         for (int i = 0; i != end; ++i) {
             Object id = propertyIds[i];
+            int type = 0;
+            
+            if (id instanceof IndexObject io) {
+            	type = io.type();
+				id = io.indexObject();
+			}
 
             // -1 for property getter, 1 for property setter, 0 for a regular value property
             int getterSetter = getterSetters == null ? 0 : getterSetters[i];
@@ -5166,6 +5172,8 @@ public class ScriptRuntime {
                     } else if (isSpecialProperty(s.stringId)) {
                         Ref ref = specialRef(object, s.stringId, cx, scope);
                         ref.set(cx, scope, value);
+                    } else if(type == Token.CONST){
+                    	ScriptableObject.defineConstProperty(object, s.stringId);
                     } else {
                         object.put(s.stringId, object, value);
                     }

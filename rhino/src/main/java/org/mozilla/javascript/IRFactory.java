@@ -513,6 +513,10 @@ public final class IRFactory {
                 } else {
                     kids.add(transform((AstNode) kid));
                 }
+                // if inside a block/scope and there is a let or const created we need to create WITH/BLOCK scopes.
+                if (!Context.isLegacyConstMode() && (kid.getType() == Token.LET || kid.getType() == Token.CONST)) {
+					parser.setRequiresActivation();
+				}
             }
             node.removeChildren();
 

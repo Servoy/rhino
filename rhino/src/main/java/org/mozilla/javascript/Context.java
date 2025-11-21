@@ -383,6 +383,14 @@ public class Context implements Closeable {
      * @since 1.7 Release 15
      */
     public static final int FEATURE_INTL_402 = 22;
+    
+    /**
+     * When enabled, constant variables (declared using "const" keyword) are in legacy rhino mode
+     * meaning that const variables are like normal variables except that they cannot be reassigned.
+     * When disabled, const variables follow the ECMAScript specification more closely, meaning that they work as 
+     * let variables in addition to being non-reassignable. Also they will throw the reassign error when trying to mutate it.
+     */
+    public static final int FEATURE_LEGACY_CONST_MODE = 23;
 
     public static final String languageVersionProperty = "language version";
     public static final String errorReporterProperty = "error reporter";
@@ -2755,6 +2763,14 @@ public class Context implements Closeable {
     public final boolean isStrictMode() {
         return isTopLevelStrict
                 || (currentActivationCall != null && currentActivationCall.isStrict);
+    }
+    
+    public static boolean isLegacyConstMode() {
+		Context cx = getCurrentContext();
+		if (cx == null) {
+			return false;
+		}
+		return cx.hasFeature(FEATURE_LEGACY_CONST_MODE);
     }
 
     public static boolean isCurrentContextStrict() {
