@@ -6,7 +6,7 @@
     <artifactId>org.eclipse.dltk.javascript.rhino</artifactId>
     <groupId>com.servoy</groupId>
     <packaging>eclipse-plugin</packaging>
-    <version>1.8.0.s10</version>
+    <version>1.8.0.s11</version>
     <prerequisites>
         <maven>3.8.6</maven>
     </prerequisites>    
@@ -25,6 +25,14 @@
             <layout>p2</layout>
         </repository>
     </repositories>
+    
+   <distributionManagement>
+        <repository>
+            <id>my-s3-release-repo</id>
+            <url>file://C:/m2-repo/</url>
+        </repository>
+    </distributionManagement>
+    
 	<build>
         <resources>
          <resource>
@@ -60,6 +68,20 @@
                             </toolchains>
                         </configuration>
                     </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-source-plugin</artifactId>
+                <version>3.2.0</version>
+                <executions>
+                    <execution>
+                        <id>attach-sources</id>
+                        <phase>verify</phase>
+                        <goals>
+                            <goal>jar-no-fork</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>                    
             <plugin>
                 <groupId>org.eclipse.tycho</groupId>
                 <artifactId>tycho-maven-plugin</artifactId>
