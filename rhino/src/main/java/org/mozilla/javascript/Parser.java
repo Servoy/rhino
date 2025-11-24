@@ -2440,16 +2440,18 @@ public class Parser implements IParser {
         }
         switch (declType) {
             case Token.LET:
-                if (!ignoreNotInBlock
-                        && ((currentScope.getType() == Token.IF) || currentScope instanceof Loop)) {
-                    addError("msg.let.decl.not.in.block");
-                    return;
-                }
-                currentScope.putSymbol(new Symbol(declType, name));
-                return;
+            case Token.CONST:
+            	if (declType == Token.LET || !Context.isLegacyConstMode()) {
+	                if (!ignoreNotInBlock
+	                        && ((currentScope.getType() == Token.IF) || currentScope instanceof Loop)) {
+	                    addError("msg.let.decl.not.in.block");
+	                    return;
+	                }
+	                currentScope.putSymbol(new Symbol(declType, name));
+	                return;
+            	}
 
             case Token.VAR:
-            case Token.CONST:
             case Token.FUNCTION:
                 if (symbol != null) {
                     if (symDeclType == Token.VAR) addStrictWarning("msg.var.redecl", name);

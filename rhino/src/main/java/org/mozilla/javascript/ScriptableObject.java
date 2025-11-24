@@ -279,7 +279,7 @@ public abstract class ScriptableObject extends SlotMapOwner
      */
     @Override
     public void put(String name, Scriptable start, Object value) {
-        if (putOwnProperty(name, start, value, Context.isCurrentContextStrict())) return;
+        if (putOwnProperty(name, start, value, Context.isCurrentContextStrict() || !Context.isLegacyConstMode())) return;
 
         if (start == this) throw Kit.codeBug();
         start.put(name, start, value);
