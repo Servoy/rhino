@@ -47,7 +47,7 @@ public class NativeJavaObject implements Scriptable, SymbolScriptable, Wrapper, 
 
     public NativeJavaObject(
             Scriptable scope, Object javaObject, Class<?> staticType, boolean isAdapter) {
-        this.parent = scope;
+        this.parent = ScriptableObject.getTopLevelScope(scope);
         this.javaObject = javaObject;
         this.staticType = staticType;
         this.isAdapter = isAdapter;
@@ -57,7 +57,7 @@ public class NativeJavaObject implements Scriptable, SymbolScriptable, Wrapper, 
     
     public NativeJavaObject(Scriptable scope, Object javaObject,
 			JavaMembers members) {
-		this.parent = scope;
+		this.parent = ScriptableObject.getTopLevelScope(scope);
 		this.javaObject = javaObject;
 		this.members = members;
 		this.isAdapter = false;
