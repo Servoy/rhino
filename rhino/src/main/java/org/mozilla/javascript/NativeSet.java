@@ -6,6 +6,9 @@
 
 package org.mozilla.javascript;
 
+import java.util.ArrayList;
+import java.util.List;
+
 public class NativeSet extends ScriptableObject {
     private static final long serialVersionUID = -8442212766987072986L;
     private static final String CLASS_NAME = "Set";
@@ -191,6 +194,21 @@ public class NativeSet extends ScriptableObject {
         return Undefined.instance;
     }
 
+    public Object[] getKeys() {
+    	List<Object> keys = new ArrayList<Object>();
+    	for (Hashtable.Entry entry : entries) {
+			keys.add(entry.key);
+		}
+		return keys.toArray();
+	}
+    
+    public Object getValue(Object key) {
+		Hashtable.Entry entry = entries.getEntry(key);
+		if (entry == null) {
+			return Undefined.instance;
+		}
+		return entry.value;
+	}
     /**
      * If an "iterable" object was passed to the constructor, there are many many things to do. This
      * is common code with NativeWeakSet.

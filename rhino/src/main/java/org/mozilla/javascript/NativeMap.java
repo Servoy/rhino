@@ -6,6 +6,7 @@
 
 package org.mozilla.javascript;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -146,6 +147,22 @@ public class NativeMap extends ScriptableObject {
         return CLASS_NAME;
     }
 
+    public Object[] getKeys() {
+    	List<Object> keys = new ArrayList<Object>();
+    	for (Hashtable.Entry entry : entries) {
+			keys.add(entry.key);
+		}
+		return keys.toArray();
+	}
+    
+    public Object getValue(Object key) {
+		Hashtable.Entry entry = entries.getEntry(key);
+		if (entry == null) {
+			return Undefined.instance;
+		}
+		return entry.value;
+	}
+    
     private static Scriptable jsConstructor(Context cx, Scriptable scope, Object[] args) {
         NativeMap nm = new NativeMap();
         nm.instanceOfMap = true;

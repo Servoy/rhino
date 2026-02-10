@@ -26,6 +26,8 @@ import org.mozilla.javascript.NativeJavaArray;
 import org.mozilla.javascript.NativeJavaClass;
 import org.mozilla.javascript.NativeJavaMethod;
 import org.mozilla.javascript.NativeJavaObject;
+import org.mozilla.javascript.NativeMap;
+import org.mozilla.javascript.NativeSet;
 import org.mozilla.javascript.Scriptable;
 import org.mozilla.javascript.ScriptableObject;
 import org.mozilla.javascript.Undefined;
@@ -312,6 +314,7 @@ public class DBGPDebugger extends Thread implements Debugger, IDebuggerWithWatch
                                         prototype,
                                         duplicates,
                                         includeFunc);
+                        if (prototype instanceof NativeMap || prototype instanceof NativeSet) break;
                         includeFunc = false;
                         prototype = prototype.getPrototype();
                     }
@@ -435,6 +438,12 @@ public class DBGPDebugger extends Thread implements Debugger, IDebuggerWithWatch
     }
 
     protected Object getDebuggerPropertyValue(Scriptable prototype, String id, Scriptable start) {
+    	if (prototype instanceof NativeMap nativeMap) {
+    		return nativeMap.getValue(id);
+    	}
+    	if (prototype instanceof NativeSet nativeSet) {
+    		return nativeSet.getValue(id);
+    	}
         return prototype.get(id, start);
     }
 
@@ -481,6 +490,10 @@ public class DBGPDebugger extends Thread implements Debugger, IDebuggerWithWatch
         Object[] ids = null;
         if (p instanceof LazyInitScope) {
             ids = ((LazyInitScope) p).getInitializedIds();
+        } else if (p instanceof NativeMap nativeMap) {
+        	ids = nativeMap.getKeys();
+        } else if (p instanceof NativeSet nativeSet) {
+        	ids = nativeSet.getKeys();
         } else if (p instanceof ScriptableObject
                 && !(p instanceof XMLObject)
                 && !(p instanceof NativeArray)) {
