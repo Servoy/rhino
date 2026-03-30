@@ -381,6 +381,9 @@ class CodeGenerator extends Icode {
             case Token.IFEQ:
             case Token.IFNE:
                 {
+                	 // PATCH: small fix to get the line number to be reported as soon as possible
+                	// if (object.property == 'x') would fail because the line number is reported later.
+                	updateLineNumber(child);
                     Node target = ((Jump) node).target;
                     visitExpression(child, 0);
                     addGoto(target, type);
