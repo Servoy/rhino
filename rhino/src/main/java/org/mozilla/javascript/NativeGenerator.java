@@ -7,8 +7,8 @@
 package org.mozilla.javascript;
 
 /**
- * This class implements generator objects. See
- * http://developer.mozilla.org/en/docs/New_in_JavaScript_1.7#Generators
+ * This class implements generator objects. See <a
+ * href="http://developer.mozilla.org/en/docs/New_in_JavaScript_1.7#Generators">Generators</a>
  *
  * @author Norris Boyd
  */
@@ -46,7 +46,7 @@ public final class NativeGenerator extends IdScriptableObject {
     /** Only for constructing the prototype object. */
     private NativeGenerator() {}
 
-    public NativeGenerator(Scriptable scope, NativeFunction function, Object savedState) {
+    public NativeGenerator(Scriptable scope, JSFunction function, Object savedState) {
         this.function = function;
         this.savedState = savedState;
         // Set parent and prototype properties. Since we don't have a
@@ -209,7 +209,7 @@ public final class NativeGenerator extends IdScriptableObject {
             Id___iterator__ = 5,
             MAX_PROTOTYPE_ID = 5;
 
-    private NativeFunction function;
+    private JSFunction function;
     private Object savedState;
     private String lineSource;
     private int lineNumber;
@@ -218,5 +218,18 @@ public final class NativeGenerator extends IdScriptableObject {
 
     public static class GeneratorClosedException extends RuntimeException {
         private static final long serialVersionUID = 2561315658662379681L;
+        private final Object value;
+
+        public GeneratorClosedException() {
+            this(Undefined.instance);
+        }
+
+        public GeneratorClosedException(Object value) {
+            this.value = value;
+        }
+
+        public Object getValue() {
+            return value;
+        }
     }
 }

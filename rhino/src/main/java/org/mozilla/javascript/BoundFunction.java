@@ -7,7 +7,7 @@
 package org.mozilla.javascript;
 
 /**
- * The class for results of the Function.bind operation EcmaScript 5 spec, 15.3.4.5
+ * The class for results of the Function.bind() operation EcmaScript 5 spec, 15.3.4.5
  *
  * @author Raphael Speyer
  */
@@ -38,13 +38,7 @@ public class BoundFunction extends BaseFunction {
         ScriptRuntime.setFunctionProtoAndParent(this, cx, scope, false);
 
         Function thrower = ScriptRuntime.typeErrorThrower(cx);
-        NativeObject throwing = new NativeObject();
-        ScriptRuntime.setBuiltinProtoAndParent(throwing, scope, TopLevel.Builtins.Object);
-        throwing.put("get", throwing, thrower);
-        throwing.put("set", throwing, thrower);
-        throwing.put("enumerable", throwing, Boolean.FALSE);
-        throwing.put("configurable", throwing, Boolean.FALSE);
-        throwing.preventExtensions();
+        var throwing = new DescriptorInfo(false, NOT_FOUND, false, thrower, thrower, NOT_FOUND);
 
         this.defineOwnProperty(cx, "caller", throwing, false);
         this.defineOwnProperty(cx, "arguments", throwing, false);

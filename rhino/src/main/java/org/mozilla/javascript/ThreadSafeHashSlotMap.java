@@ -3,6 +3,8 @@ package org.mozilla.javascript;
 import java.util.concurrent.locks.StampedLock;
 
 @SuppressWarnings("AndroidJdkLibsChecker")
+// https://developer.android.com/reference/java/util/concurrent/locks/StampedLock added in API level
+// 24
 class ThreadSafeHashSlotMap extends HashSlotMap implements LockAwareSlotMap {
 
     private final StampedLock lock;
@@ -26,7 +28,7 @@ class ThreadSafeHashSlotMap extends HashSlotMap implements LockAwareSlotMap {
     }
 
     public ThreadSafeHashSlotMap(StampedLock lock, SlotMap oldMap, Slot newSlot) {
-        super(oldMap.size() + 1);
+        super(oldMap.dirtySize() + 1);
         this.lock = lock;
         for (Slot n : oldMap) {
             addWithLock(null, n.copySlot());
@@ -52,7 +54,7 @@ class ThreadSafeHashSlotMap extends HashSlotMap implements LockAwareSlotMap {
 
     @Override
     public int dirtySize() {
-        assert lock.isReadLocked();
+        assert lock.isReadLocked() || lock.isWriteLocked();
         return super.size();
     }
 
@@ -84,10 +86,14 @@ class ThreadSafeHashSlotMap extends HashSlotMap implements LockAwareSlotMap {
 
     @Override
     public <S extends Slot> S compute(
-            SlotMapOwner owner, Object key, int index, SlotComputer<S> c) {
+            SlotMapOwner owner,
+            CompoundOperationMap mutableMap,
+            Object key,
+            int index,
+            SlotComputer<S> c) {
         final long stamp = lock.writeLock();
         try {
-            return super.compute(owner, key, index, c);
+            return super.compute(owner, mutableMap, key, index, c);
         } finally {
             lock.unlockWrite(stamp);
         }
@@ -126,8 +132,12 @@ class ThreadSafeHashSlotMap extends HashSlotMap implements LockAwareSlotMap {
 
     @Override
     public <S extends Slot> S computeWithLock(
-            SlotMapOwner owner, Object key, int index, SlotComputer<S> compute) {
-        return super.compute(owner, key, index, compute);
+            SlotMapOwner owner,
+            CompoundOperationMap mutableMap,
+            Object key,
+            int index,
+            SlotComputer<S> compute) {
+        return super.compute(owner, mutableMap, key, index, compute);
     }
 
     @Override
@@ -151,12 +161,17 @@ class ThreadSafeHashSlotMap extends HashSlotMap implements LockAwareSlotMap {
     }
 
     @Override
-    public long readLock() {
+    public long getReadLock() {
         return lock.readLock();
     }
 
     @Override
-    public void unlockRead(long stamp) {
+    public long getWriteLock() {
+        return lock.writeLock();
+    }
+
+    @Override
+    public void releaseLock(long stamp) {
         lock.unlock(stamp);
     }
 }

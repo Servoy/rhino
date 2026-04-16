@@ -12,4 +12,21 @@ package org.mozilla.javascript;
  *
  * @since 1.7.8
  */
-public interface Symbol {}
+public interface Symbol {
+
+    /** Represents the kind of the symbol, built in, registered, or normal. */
+    enum Kind {
+        REGULAR, // A regular symbol is created using the constructor
+        BUILT_IN, // A built-in symbol is one of the properties of the "Symbol" constructor
+        REGISTERED // A registered symbol was created using "Symbol.for"
+    }
+
+    /**
+     * Returns the symbol's name. Returns empty string for anonymous symbol (i.e. something created
+     * with {@code Symbol()}).
+     */
+    String getName();
+
+    /** Returns the symbol's kind. */
+    Kind getKind();
+}

@@ -26,6 +26,7 @@ public class EmbeddedSlotMap implements SlotMap {
     private Slot lastAdded;
 
     private int count;
+    private boolean hasIndex = false;
 
     // initial slot array size, must be a power of 2
     private static final int INITIAL_SLOT_SIZE = 4;
@@ -79,7 +80,7 @@ public class EmbeddedSlotMap implements SlotMap {
     /** Locate the slot with the given name or index. */
     @Override
     public Slot query(Object key, int index) {
-        if (slots == null) {
+        if (slots == null || (key == null && !hasIndex)) {
             return null;
         }
 
@@ -130,7 +131,7 @@ public class EmbeddedSlotMap implements SlotMap {
         // Check if the table is not too full before inserting.
         if (4 * (count + 1) > 3 * slots.length) {
             // table size must be a power of 2 -- always grow by x2!
-            if (count > SlotMapOwner.LARGE_HASH_SIZE) {
+            if (count >= SlotMapOwner.LARGE_HASH_SIZE) {
                 promoteMap(owner, newSlot);
                 return;
             }
@@ -149,7 +150,11 @@ public class EmbeddedSlotMap implements SlotMap {
 
     @Override
     public <S extends Slot> S compute(
-            SlotMapOwner owner, Object key, int index, SlotComputer<S> c) {
+            SlotMapOwner owner,
+            CompoundOperationMap compoundOp,
+            Object key,
+            int index,
+            SlotComputer<S> c) {
         final int indexOrHash = (key != null ? key.hashCode() : index);
 
         if (slots != null) {
@@ -163,54 +168,74 @@ public class EmbeddedSlotMap implements SlotMap {
                 prev = slot;
             }
             if (slot != null) {
-                return computeExisting(key, index, c, slot, prev, slotIndex);
+                return computeExisting(owner, compoundOp, key, index, c, slot, prev, slotIndex);
             }
         }
-        return computeNew(owner, key, index, c);
+        return computeNew(owner, compoundOp, key, index, c);
     }
 
     private <S extends Slot> S computeNew(
-            SlotMapOwner owner, Object key, int index, SlotComputer<S> c) {
-        S newSlot = c.compute(key, index, null);
+            SlotMapOwner owner,
+            CompoundOperationMap compoundOp,
+            Object key,
+            int index,
+            SlotComputer<S> c) {
+        S newSlot = c.compute(key, index, null, compoundOp, owner);
         if (newSlot != null) {
-            createNewSlot(owner, newSlot);
+            if (!compoundOp.touched) {
+                createNewSlot(owner, newSlot);
+            } else {
+                owner.getMap().add(owner, newSlot);
+            }
         }
         return newSlot;
     }
 
     private <S extends Slot> S computeExisting(
-            Object key, int index, SlotComputer<S> c, Slot slot, Slot prev, int slotIndex) {
+            SlotMapOwner owner,
+            CompoundOperationMap compoundOp,
+            Object key,
+            int index,
+            SlotComputer<S> c,
+            Slot slot,
+            Slot prev,
+            int slotIndex) {
         // Modify or remove existing slot
-        S newSlot = c.compute(key, index, slot);
-        if (newSlot == null) {
-            // Need to delete this slot actually
-            removeSlot(slot, prev, slotIndex, key);
-        } else if (!Objects.equals(slot, newSlot)) {
-            // Replace slot in hash table
-            if (prev == slot) {
-                slots[slotIndex] = newSlot;
-            } else {
-                prev.next = newSlot;
-            }
-            newSlot.next = slot.next;
-            // Replace new slot in linked list, keeping same order
-            if (slot == firstAdded) {
-                firstAdded = newSlot;
-            } else {
-                Slot ps = firstAdded;
-                while ((ps != null) && (ps.orderedNext != slot)) {
-                    ps = ps.orderedNext;
+        S newSlot = c.compute(key, index, slot, compoundOp, owner);
+        if (!compoundOp.touched) {
+            if (newSlot == null) {
+                // Need to delete this slot actually
+                removeSlot(slot, prev, slotIndex, key);
+            } else if (!Objects.equals(slot, newSlot)) {
+                // Replace slot in hash table
+                if (prev == slot) {
+                    slots[slotIndex] = newSlot;
+                } else {
+                    prev.next = newSlot;
                 }
-                if (ps != null) {
-                    ps.orderedNext = newSlot;
+                newSlot.next = slot.next;
+                // Replace new slot in linked list, keeping same order
+                if (slot == firstAdded) {
+                    firstAdded = newSlot;
+                } else {
+                    Slot ps = firstAdded;
+                    while ((ps != null) && (ps.orderedNext != slot)) {
+                        ps = ps.orderedNext;
+                    }
+                    if (ps != null) {
+                        ps.orderedNext = newSlot;
+                    }
+                }
+                newSlot.orderedNext = slot.orderedNext;
+                if (slot == lastAdded) {
+                    lastAdded = newSlot;
                 }
             }
-            newSlot.orderedNext = slot.orderedNext;
-            if (slot == lastAdded) {
-                lastAdded = newSlot;
-            }
+            return newSlot;
+        } else {
+            return compoundOp.compute(
+                    owner, compoundOp, key, slotIndex, (k, i, s, m, o) -> newSlot);
         }
-        return newSlot;
     }
 
     @Override
@@ -231,6 +256,7 @@ public class EmbeddedSlotMap implements SlotMap {
             firstAdded = newSlot;
         }
         lastAdded = newSlot;
+        if (newSlot.name == null) hasIndex = true;
         addKnownAbsentSlot(slots, newSlot);
     }
 

@@ -6,12 +6,17 @@
 
 package org.mozilla.javascript;
 
-import java.util.Objects;
-
-public final class ES6Generator extends IdScriptableObject {
+public final class ES6Generator extends ScriptableObject {
     private static final long serialVersionUID = 1645892441041347273L;
 
-    private static final Object GENERATOR_TAG = "Generator";
+    static final Object GENERATOR_TAG = "Generator";
+
+    private JSFunction function;
+    private Object savedState;
+    private String lineSource;
+    private int lineNumber;
+    private State state = State.SUSPENDED_START;
+    private Object delegee;
 
     static ES6Generator init(ScriptableObject scope, boolean sealed) {
 
@@ -20,7 +25,23 @@ public final class ES6Generator extends IdScriptableObject {
             prototype.setParentScope(scope);
             prototype.setPrototype(getObjectPrototype(scope));
         }
-        prototype.activatePrototypeMap(MAX_PROTOTYPE_ID);
+
+        // Define prototype methods using LambdaFunction
+        LambdaFunction next = new LambdaFunction(scope, "next", 1, ES6Generator::js_next);
+        ScriptableObject.defineProperty(prototype, "next", next, DONTENUM);
+
+        LambdaFunction returnFunc = new LambdaFunction(scope, "return", 1, ES6Generator::js_return);
+        ScriptableObject.defineProperty(prototype, "return", returnFunc, DONTENUM);
+
+        LambdaFunction throwFunc = new LambdaFunction(scope, "throw", 1, ES6Generator::js_throw);
+        ScriptableObject.defineProperty(prototype, "throw", throwFunc, DONTENUM);
+
+        LambdaFunction iterator =
+                new LambdaFunction(scope, "[Symbol.iterator]", 0, ES6Generator::js_iterator);
+        prototype.defineProperty(SymbolKey.ITERATOR, iterator, DONTENUM);
+
+        prototype.defineProperty(SymbolKey.TO_STRING_TAG, "Generator", DONTENUM | READONLY);
+
         if (sealed) {
             prototype.sealObject();
         }
@@ -39,17 +60,25 @@ public final class ES6Generator extends IdScriptableObject {
     /** Only for constructing the prototype object. */
     private ES6Generator() {}
 
-    public ES6Generator(Scriptable scope, NativeFunction function, Object savedState) {
+    public ES6Generator(Scriptable scope, JSFunction function, Object savedState) {
         this.function = function;
         this.savedState = savedState;
-        // Set parent and prototype properties. Since we don't have a
-        // "Generator" constructor in the top scope, we stash the
-        // prototype in the top scope's associated value.
+        // Set parent and prototype properties.
         Scriptable top = ScriptableObject.getTopLevelScope(scope);
         this.setParentScope(top);
-        ES6Generator prototype =
-                (ES6Generator) ScriptableObject.getTopScopeValue(top, GENERATOR_TAG);
-        this.setPrototype(prototype);
+        // Per ES6 spec, generator instance's [[Prototype]] should be
+        // the generator function's .prototype property.
+        Object functionPrototype = ScriptableObject.getProperty(function, "prototype");
+        if (functionPrototype instanceof Scriptable) {
+            this.setPrototype((Scriptable) functionPrototype);
+        } else {
+            // If function.prototype is not an Object, use the intrinsic default prototype
+            // Ref: Ecma 2026, 10.1.14 GetPrototypeFromConstructor step 4.
+            // See test262: language/statements/generators/default-proto.js
+            ES6Generator prototype =
+                    (ES6Generator) ScriptableObject.getTopScopeValue(top, GENERATOR_TAG);
+            this.setPrototype(prototype);
+        }
     }
 
     @Override
@@ -57,83 +86,52 @@ public final class ES6Generator extends IdScriptableObject {
         return "Generator";
     }
 
-    @Override
-    protected void initPrototypeId(int id) {
-        if (id == SymbolId_iterator) {
-            initPrototypeMethod(GENERATOR_TAG, id, SymbolKey.ITERATOR, "[Symbol.iterator]", 0);
-            return;
-        }
-
-        String s;
-        int arity;
-        switch (id) {
-            case Id_next:
-                arity = 1;
-                s = "next";
-                break;
-            case Id_return:
-                arity = 1;
-                s = "return";
-                break;
-            case Id_throw:
-                arity = 1;
-                s = "throw";
-                break;
-            default:
-                throw new IllegalArgumentException(String.valueOf(id));
-        }
-        initPrototypeMethod(GENERATOR_TAG, id, s, arity);
+    private static ES6Generator realThis(Scriptable thisObj) {
+        return LambdaConstructor.convertThisObject(thisObj, ES6Generator.class);
     }
 
-    @Override
-    public Object execIdCall(
-            IdFunctionObject f, Context cx, Scriptable scope, Scriptable thisObj, Object[] args) {
-        if (!f.hasTag(GENERATOR_TAG)) {
-            return super.execIdCall(f, cx, scope, thisObj, args);
-        }
-        int id = f.methodId();
-
-        ES6Generator generator = ensureType(thisObj, ES6Generator.class, f);
+    private static Object js_return(
+            Context cx, Scriptable scope, Scriptable thisObj, Object[] args) {
+        ES6Generator generator = realThis(thisObj);
         Object value = args.length >= 1 ? args[0] : Undefined.instance;
-
-        switch (id) {
-            case Id_return:
-                if (generator.delegee == null) {
-                    return generator.resumeAbruptLocal(
-                            cx, scope, NativeGenerator.GENERATOR_CLOSE, value);
-                }
-                return generator.resumeDelegeeReturn(cx, scope, value);
-            case Id_next:
-                if (generator.delegee == null) {
-                    return generator.resumeLocal(cx, scope, value);
-                }
-                return generator.resumeDelegee(cx, scope, value);
-            case Id_throw:
-                if (generator.delegee == null) {
-                    return generator.resumeAbruptLocal(
-                            cx, scope, NativeGenerator.GENERATOR_THROW, value);
-                }
-                return generator.resumeDelegeeThrow(cx, scope, value);
-            case SymbolId_iterator:
-                return thisObj;
-            default:
-                throw new IllegalArgumentException(String.valueOf(id));
+        if (generator.delegee == null) {
+            return generator.resumeAbruptLocal(cx, scope, NativeGenerator.GENERATOR_CLOSE, value);
         }
+        return generator.resumeDelegeeReturn(cx, scope, value);
+    }
+
+    private static Object js_next(Context cx, Scriptable scope, Scriptable thisObj, Object[] args) {
+        ES6Generator generator = realThis(thisObj);
+        Object value = args.length >= 1 ? args[0] : Undefined.instance;
+        if (generator.delegee == null) {
+            return generator.resumeLocal(cx, scope, value);
+        }
+        return generator.resumeDelegee(cx, scope, value);
+    }
+
+    private static Object js_throw(
+            Context cx, Scriptable scope, Scriptable thisObj, Object[] args) {
+        ES6Generator generator = realThis(thisObj);
+        Object value = args.length >= 1 ? args[0] : Undefined.instance;
+        if (generator.delegee == null) {
+            return generator.resumeAbruptLocal(cx, scope, NativeGenerator.GENERATOR_THROW, value);
+        }
+        return generator.resumeDelegeeThrow(cx, scope, value);
+    }
+
+    private static Object js_iterator(
+            Context cx, Scriptable scope, Scriptable thisObj, Object[] args) {
+        return thisObj;
     }
 
     private Scriptable resumeDelegee(Context cx, Scriptable scope, Object value) {
         try {
             // Be super-careful and only pass an arg to next if it expects one
             Object[] nextArgs =
-                    Undefined.instance.equals(value)
-                            ? ScriptRuntime.emptyArgs
-                            : new Object[] {value};
+                    Undefined.isUndefined(value) ? ScriptRuntime.emptyArgs : new Object[] {value};
 
-            Callable nextFn =
-                    ScriptRuntime.getPropFunctionAndThis(
-                            delegee, ES6Iterator.NEXT_METHOD, cx, scope);
-            Scriptable nextThis = ScriptRuntime.lastStoredScriptable(cx);
-            Object nr = nextFn.call(cx, scope, nextThis, nextArgs);
+            var nextFn = ScriptRuntime.getPropAndThis(delegee, ES6Iterator.NEXT_METHOD, cx, scope);
+            Object nr = nextFn.call(cx, scope, nextArgs);
 
             Scriptable nextResult = ScriptableObject.ensureScriptable(nr);
             if (ScriptRuntime.isIteratorDone(cx, nextResult)) {
@@ -160,9 +158,8 @@ public final class ES6Generator extends IdScriptableObject {
         boolean returnCalled = false;
         try {
             // Delegate to "throw" method. If it's not defined we'll get an error here.
-            Callable throwFn = ScriptRuntime.getPropFunctionAndThis(delegee, "throw", cx, scope);
-            Scriptable nextThis = ScriptRuntime.lastStoredScriptable(cx);
-            Object throwResult = throwFn.call(cx, scope, nextThis, new Object[] {value});
+            var throwFn = ScriptRuntime.getPropAndThis(delegee, "throw", cx, scope);
+            Object throwResult = throwFn.call(cx, scope, new Object[] {value});
 
             if (ScriptRuntime.isIteratorDone(cx, throwResult)) {
                 // Iterator is "done".
@@ -203,7 +200,11 @@ public final class ES6Generator extends IdScriptableObject {
         try {
             // Call "return" but don't throw if it can't be found
             Object retResult = callReturnOptionally(cx, scope, value);
-            if (retResult != null) {
+            // See https://tc39.es/ecma262/#sec-iteratorclose (2026, 7.4.11, 4b)
+            // This calls GetMethod: https://tc39.es/ecma262/#sec-getmethod (2026, 7.3.10, 2)
+            // We need to check if the return value is present and after the call
+            // if return value is not undefined treat it same as null
+            if (retResult != null && !Undefined.isUndefined(retResult)) {
                 if (ScriptRuntime.isIteratorDone(cx, retResult)) {
                     // Iterator is "done".
                     delegee = null;
@@ -329,7 +330,7 @@ public final class ES6Generator extends IdScriptableObject {
         Object throwValue = value;
         if (op == NativeGenerator.GENERATOR_CLOSE) {
             if (!(value instanceof NativeGenerator.GeneratorClosedException)) {
-                throwValue = new NativeGenerator.GeneratorClosedException();
+                throwValue = new NativeGenerator.GeneratorClosedException(value);
             }
         } else {
             if (value instanceof JavaScriptException) {
@@ -347,6 +348,7 @@ public final class ES6Generator extends IdScriptableObject {
 
         } catch (NativeGenerator.GeneratorClosedException gce) {
             state = State.COMPLETED;
+            ScriptableObject.putProperty(result, ES6Iterator.VALUE_PROPERTY, gce.getValue());
         } catch (JavaScriptException jse) {
             state = State.COMPLETED;
             if (jse.getValue() instanceof NativeIterator.StopIteration) {
@@ -380,11 +382,13 @@ public final class ES6Generator extends IdScriptableObject {
 
     private Object callReturnOptionally(Context cx, Scriptable scope, Object value) {
         Object[] retArgs =
-                Undefined.instance.equals(value) ? ScriptRuntime.emptyArgs : new Object[] {value};
+                Undefined.isUndefined(value) ? ScriptRuntime.emptyArgs : new Object[] {value};
         // Delegate to "return" method. If it's not defined we ignore it
         Object retFnObj =
                 ScriptRuntime.getObjectPropNoWarn(delegee, ES6Iterator.RETURN_METHOD, cx, scope);
-        if (!Undefined.instance.equals(retFnObj)) {
+        // Treat a return method that's null or undefined as if it doesn't exist
+        // See https://tc39.es/ecma262/#sec-getmethod (2026, 7.3.10, 2)
+        if (retFnObj != null && !Undefined.isUndefined(retFnObj)) {
             if (!(retFnObj instanceof Callable)) {
                 throw ScriptRuntime.typeErrorById(
                         "msg.isnt.function",
@@ -395,51 +399,6 @@ public final class ES6Generator extends IdScriptableObject {
         }
         return null;
     }
-
-    @Override
-    protected int findPrototypeId(Symbol k) {
-        if (SymbolKey.ITERATOR.equals(k)) {
-            return SymbolId_iterator;
-        }
-        return 0;
-    }
-
-    @Override
-    protected int findPrototypeId(String s) {
-        int id;
-        L0:
-        {
-            id = 0;
-            String X = null;
-            int s_length = s.length();
-            if (s_length == 4) {
-                X = "next";
-                id = Id_next;
-            } else if (s_length == 5) {
-                X = "throw";
-                id = Id_throw;
-            } else if (s_length == 6) {
-                X = "return";
-                id = Id_return;
-            }
-            if (!Objects.equals(X, s)) id = 0;
-            break L0;
-        }
-        return id;
-    }
-
-    private static final int Id_next = 1,
-            Id_return = 2,
-            Id_throw = 3,
-            SymbolId_iterator = 4,
-            MAX_PROTOTYPE_ID = SymbolId_iterator;
-
-    private NativeFunction function;
-    private Object savedState;
-    private String lineSource;
-    private int lineNumber;
-    private State state = State.SUSPENDED_START;
-    private Object delegee;
 
     enum State {
         SUSPENDED_START,

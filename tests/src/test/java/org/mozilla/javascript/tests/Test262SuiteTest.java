@@ -49,10 +49,12 @@ import org.mozilla.javascript.ScriptRuntime;
 import org.mozilla.javascript.Scriptable;
 import org.mozilla.javascript.ScriptableObject;
 import org.mozilla.javascript.SymbolKey;
+import org.mozilla.javascript.TopLevel;
 import org.mozilla.javascript.Undefined;
 import org.mozilla.javascript.drivers.TestUtils;
 import org.mozilla.javascript.tools.SourceReader;
 import org.mozilla.javascript.tools.shell.ShellContextFactory;
+import org.mozilla.javascript.typedarrays.NativeArrayBuffer;
 import org.yaml.snakeyaml.Yaml;
 import org.yaml.snakeyaml.error.YAMLException;
 
@@ -80,8 +82,8 @@ public class Test262SuiteTest {
     private static final boolean statsEnabled;
     private static final boolean includeUnsupported;
 
-    static Map<String, Script> HARNESS_SCRIPT_CACHE = new ConcurrentHashMap<>();
-    static Map<Test262Case, TestResultTracker> RESULT_TRACKERS = new LinkedHashMap<>();
+    static final Map<String, Script> HARNESS_SCRIPT_CACHE = new ConcurrentHashMap<>();
+    static final Map<Test262Case, TestResultTracker> RESULT_TRACKERS = new LinkedHashMap<>();
 
     static ShellContextFactory CTX_FACTORY = new ShellContextFactory();
 
@@ -90,7 +92,6 @@ public class Test262SuiteTest {
                     Arrays.asList(
                             "Atomics",
                             "IsHTMLDDA",
-                            "SharedArrayBuffer",
                             "async-functions",
                             "async-iteration",
                             "class",
@@ -100,11 +101,12 @@ public class Test262SuiteTest {
                             "new.target",
                             "object-rest",
                             "regexp-dotall",
-                            "regexp-lookbehind",
-                            "regexp-named-groups",
                             "regexp-unicode-property-escapes",
                             "resizable-arraybuffer",
+                            "SharedArrayBuffer",
                             "tail-call-optimization",
+                            "Temporal",
+                            "upsert",
                             "u180e"));
 
     static {
@@ -268,7 +270,7 @@ public class Test262SuiteTest {
                                                         .relativize(testFilePath)
                                                         .toString()
                                                         .replace("\\", "/")
-                                                + (statsEnabled && testResult != ""
+                                                + (statsEnabled && !testResult.isEmpty()
                                                         ? " " + testResult
                                                         : "");
                                 if (tt.comment != null && !tt.comment.isEmpty()) {
@@ -416,18 +418,10 @@ public class Test262SuiteTest {
             proto.setPrototype(getObjectPrototype(scope));
             proto.setParentScope(scope);
 
-            proto.defineProperty(scope, "gc", 0, $262::gc, DONTENUM, DONTENUM | READONLY);
-            proto.defineProperty(
-                    scope, "createRealm", 0, $262::createRealm, DONTENUM, DONTENUM | READONLY);
-            proto.defineProperty(
-                    scope, "evalScript", 1, $262::evalScript, DONTENUM, DONTENUM | READONLY);
-            proto.defineProperty(
-                    scope,
-                    "detachArrayBuffer",
-                    0,
-                    $262::detachArrayBuffer,
-                    DONTENUM,
-                    DONTENUM | READONLY);
+            proto.defineProperty(scope, "gc", 0, $262::gc);
+            proto.defineProperty(scope, "createRealm", 0, $262::createRealm);
+            proto.defineProperty(scope, "evalScript", 1, $262::evalScript);
+            proto.defineProperty(scope, "detachArrayBuffer", 0, $262::detachArrayBuffer);
 
             proto.defineProperty(cx, "global", $262::getGlobal, null, DONTENUM | READONLY);
             proto.defineProperty(cx, "agent", $262::getAgent, null, DONTENUM | READONLY);
@@ -467,14 +461,17 @@ public class Test262SuiteTest {
 
         public static $262 createRealm(
                 Context cx, Scriptable scope, Scriptable thisObj, Object[] args) {
-            ScriptableObject realm = cx.initSafeStandardObjects();
+            ScriptableObject realm = (ScriptableObject) cx.initSafeStandardObjects(new TopLevel());
             return install(realm, thisObj.getPrototype());
         }
 
         public static Object detachArrayBuffer(
                 Context cx, Scriptable scope, Scriptable thisObj, Object[] args) {
-            throw new UnsupportedOperationException(
-                    "$262.detachArrayBuffer() method not yet implemented");
+            Scriptable buf = ScriptRuntime.toObject(scope, args[0]);
+            if (buf instanceof NativeArrayBuffer) {
+                ((NativeArrayBuffer) buf).detach();
+            }
+            return Undefined.instance;
         }
 
         public static Object getAgent(Scriptable scriptable) {
@@ -488,7 +485,7 @@ public class Test262SuiteTest {
     }
 
     private Scriptable buildScope(Context cx, Test262Case testCase, boolean interpretedMode) {
-        ScriptableObject scope = cx.initSafeStandardObjects();
+        ScriptableObject scope = (ScriptableObject) cx.initSafeStandardObjects(new TopLevel());
 
         for (String harnessFile : testCase.harnessFiles) {
             String harnessKey = harnessFile + '-' + interpretedMode;
@@ -506,7 +503,7 @@ public class Test262SuiteTest {
                                             "Error reading test file " + harnessPath, ioe);
                                 }
                             });
-            harnessScript.exec(cx, scope);
+            harnessScript.exec(cx, scope, scope);
         }
 
         $262 proto = $262.init(cx, scope);
@@ -544,14 +541,7 @@ public class Test262SuiteTest {
 
             boolean failedEarly = false;
             try {
-                Scriptable scope;
-                try {
-                    scope = buildScope(cx, testCase, testMode == TestMode.INTERPRETED);
-                } catch (Exception ex) {
-                    throw new RuntimeException(
-                            "Failed to build a scope with the harness files.", ex);
-                }
-
+                Scriptable scope = buildScope(cx, testCase, testMode == TestMode.INTERPRETED);
                 String str = testCase.source;
                 int line = 1;
                 if (useStrict) {
@@ -563,7 +553,7 @@ public class Test262SuiteTest {
                 Script caseScript = cx.compileString(str, testFilePath, line, null);
 
                 failedEarly = false; // not after this line
-                caseScript.exec(cx, scope);
+                caseScript.exec(cx, scope, scope);
 
                 if (testCase.isNegative()) {
                     fail(
@@ -611,7 +601,7 @@ public class Test262SuiteTest {
                         tracker.passes(testMode, useStrict);
                     }
                 }
-            } catch (Exception ex) {
+            } catch (RuntimeException ex) {
                 // enable line below to print out stacktraces of unexpected exceptions
                 // disabled for now because too many exceptions are throw
                 // Unexpected non-Rhino-Exception here, so print the exception so it stands out
@@ -994,7 +984,7 @@ public class Test262SuiteTest {
     }
 
     private static class TestResultTracker {
-        private Set<String> modes = new HashSet<>();
+        private final Set<String> modes = new HashSet<>();
         private boolean onlyStrict;
         private boolean noStrict;
         private boolean expectedFailure;
@@ -1062,7 +1052,7 @@ public class Test262SuiteTest {
             }
 
             // simplify the output for some cases
-            ArrayList res = new ArrayList<>(modes);
+            ArrayList<String> res = new ArrayList<>(modes);
             if (res.contains("compiled-non-strict") && res.contains("interpreted-non-strict")) {
                 res.remove("compiled-non-strict");
                 res.remove("interpreted-non-strict");

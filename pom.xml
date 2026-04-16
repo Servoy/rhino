@@ -6,7 +6,7 @@
     <artifactId>org.eclipse.dltk.javascript.rhino</artifactId>
     <groupId>com.servoy</groupId>
     <packaging>eclipse-plugin</packaging>
-    <version>1.8.0.s13</version>
+    <version>1.9.1.s1</version>
     <prerequisites>
         <maven>3.8.6</maven>
     </prerequisites>    

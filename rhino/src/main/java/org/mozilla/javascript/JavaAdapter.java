@@ -6,6 +6,8 @@
 
 package org.mozilla.javascript;
 
+import static org.mozilla.javascript.ScriptableObject.DONTENUM;
+
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
@@ -25,69 +27,46 @@ import java.util.Map;
 import java.util.Set;
 import org.mozilla.classfile.ByteCode;
 import org.mozilla.classfile.ClassFileWriter;
+import org.mozilla.javascript.lc.type.TypeInfo;
 
-public final class JavaAdapter implements IdFunctionCall {
+public final class JavaAdapter {
     /**
      * Provides a key with which to distinguish previously generated adapter classes stored in a
      * hash table.
+     *
+     * <p>JavaAdapter should cache the adapter class when input classes are the same, and
+     * implementation object are of "same shape", which means having same number of function
+     * properties, and same length for each function
      */
     static class JavaAdapterSignature {
         Class<?> superClass;
         Class<?>[] interfaces;
+        // name -> function arg length
         Map<String, Integer> names;
-
-        JavaAdapterSignature(
-                Class<?> superClass, Class<?>[] interfaces, Map<String, Integer> names) {
-            this.superClass = superClass;
-            this.interfaces = interfaces;
-            this.names = names;
-        }
 
         @Override
         public boolean equals(Object obj) {
             if (!(obj instanceof JavaAdapterSignature)) return false;
             JavaAdapterSignature sig = (JavaAdapterSignature) obj;
-            if (superClass != sig.superClass) return false;
-            if (interfaces != sig.interfaces) {
-                if (interfaces.length != sig.interfaces.length) return false;
-                for (int i = 0; i < interfaces.length; i++)
-                    if (interfaces[i] != sig.interfaces[i]) return false;
-            }
-            if (names.size() != sig.names.size()) return false;
-            for (Map.Entry<String, Integer> e : names.entrySet()) {
-                String name = e.getKey();
-                int arity = e.getValue();
-                if (arity != sig.names.getOrDefault(name, arity + 1)) return false;
-            }
-            return true;
+            return superClass == sig.superClass
+                    && Arrays.equals(interfaces, sig.interfaces)
+                    && names.equals(sig.names);
         }
 
         @Override
         public int hashCode() {
-            return (superClass.hashCode() + Arrays.hashCode(interfaces)) ^ names.size();
+            return (superClass.hashCode() * 31 + Arrays.hashCode(interfaces)) ^ names.size();
         }
     }
 
     public static void init(Context cx, Scriptable scope, boolean sealed) {
-        JavaAdapter obj = new JavaAdapter();
-        IdFunctionObject ctor =
-                new IdFunctionObject(obj, FTAG, Id_JavaAdapter, "JavaAdapter", 1, scope);
-        ctor.markAsConstructor(null);
+        var ctor = new LambdaConstructor(scope, "JavaAdapter", 1, JavaAdapter::js_createAdapter);
+
         if (sealed) {
             ctor.sealObject();
         }
-        ctor.exportAsScopeProperty();
-    }
 
-    @Override
-    public Object execIdCall(
-            IdFunctionObject f, Context cx, Scriptable scope, Scriptable thisObj, Object[] args) {
-        if (f.hasTag(FTAG)) {
-            if (f.methodId() == Id_JavaAdapter) {
-                return js_createAdapter(cx, scope, args);
-            }
-        }
-        throw f.unknown();
+        ScriptableObject.defineProperty(scope, "JavaAdapter", ctor, DONTENUM);
     }
 
     public static Object convertResult(Object result, Class<?> c) {
@@ -101,7 +80,7 @@ public final class JavaAdapter implements IdFunctionCall {
 
     public static Scriptable createAdapterWrapper(Scriptable obj, Object adapter) {
         Scriptable scope = ScriptableObject.getTopLevelScope(obj);
-        NativeJavaObject res = new NativeJavaObject(scope, adapter, null, true);
+        NativeJavaObject res = new NativeJavaObject(scope, adapter, TypeInfo.NONE, true);
         res.setPrototype(obj);
         return res;
     }
@@ -112,7 +91,7 @@ public final class JavaAdapter implements IdFunctionCall {
         return self.get(adapter);
     }
 
-    static Object js_createAdapter(Context cx, Scriptable scope, Object[] args) {
+    static Scriptable js_createAdapter(Context cx, Scriptable scope, Object[] args) {
         int N = args.length;
         if (N == 0) {
             throw ScriptRuntime.typeErrorById("msg.adapter.zero.args");
@@ -122,51 +101,21 @@ public final class JavaAdapter implements IdFunctionCall {
         // Any number of NativeJavaClass objects representing the super-class
         // and/or interfaces to implement, followed by one NativeObject providing
         // the implementation, followed by any number of arguments to pass on
-        // to the (super-class) constructor.
+        // to the (super-class) constructor:
+        // new JavaAdapter(
+        //     AbstractClazz, Interface1, Interface2,
+        //     { someMethod: function(args) {}, someOtherMethod: function(args) {} },
+        //     ["args for AbstractClazz ctor"]
+        // )
 
-        int classCount;
-        for (classCount = 0; classCount < N - 1; classCount++) {
-            Object arg = args[classCount];
-            // We explicitly test for NativeObject here since checking for
-            // instanceof ScriptableObject or !(instanceof NativeJavaClass)
-            // would fail for a Java class that isn't found in the class path
-            // as NativeJavaPackage extends ScriptableObject.
-            if (arg instanceof NativeObject) {
-                break;
-            }
-            if (!(arg instanceof NativeJavaClass)) {
-                throw ScriptRuntime.typeErrorById(
-                        "msg.not.java.class.arg",
-                        String.valueOf(classCount),
-                        ScriptRuntime.toString(arg));
-            }
-        }
-        Class<?> superClass = null;
-        Class<?>[] intfs = new Class[classCount];
-        int interfaceCount = 0;
-        for (int i = 0; i < classCount; ++i) {
-            Class<?> c = ((NativeJavaClass) args[i]).getClassObject();
-            if (!c.isInterface()) {
-                if (superClass != null) {
-                    throw ScriptRuntime.typeErrorById(
-                            "msg.only.one.super", superClass.getName(), c.getName());
-                }
-                superClass = c;
-            } else {
-                intfs[interfaceCount++] = c;
-            }
-        }
+        var sig = new JavaAdapterSignature();
+        var classCount = fillAdapterInheritanceData(args, sig);
 
-        if (superClass == null) {
-            superClass = ScriptRuntime.ObjectClass;
-        }
-
-        Class<?>[] interfaces = new Class[interfaceCount];
-        System.arraycopy(intfs, 0, interfaces, 0, interfaceCount);
         // next argument is implementation, must be scriptable
         Scriptable obj = ScriptableObject.ensureScriptable(args[classCount]);
+        sig.names = getObjectFunctionNames(obj);
 
-        Class<?> adapterClass = getAdapterClass(scope, superClass, interfaces, obj);
+        Class<?> adapterClass = getAdapterClass(scope, sig);
         Object adapter;
 
         int argsCount = N - classCount - 1;
@@ -184,9 +133,10 @@ public final class JavaAdapter implements IdFunctionCall {
                 NativeJavaMethod ctors = classWrapper.members.ctors;
                 int index = ctors.findCachedFunction(cx, ctorArgs);
                 if (index < 0) {
-                    String sig = NativeJavaMethod.scriptSignature(args);
                     throw Context.reportRuntimeErrorById(
-                            "msg.no.java.ctor", adapterClass.getName(), sig);
+                            "msg.no.java.ctor",
+                            adapterClass.getName(),
+                            NativeJavaMethod.scriptSignature(args));
                 }
 
                 // Found the constructor, so try invoking it.
@@ -199,7 +149,7 @@ public final class JavaAdapter implements IdFunctionCall {
                 adapter = adapterClass.getConstructor(ctorParms).newInstance(ctorArgs);
             }
 
-            Object self = getAdapterSelf(adapterClass, adapter);
+            var self = (Scriptable) getAdapterSelf(adapterClass, adapter);
             // Return unwrapped JavaAdapter if it implements Scriptable
             if (self instanceof Wrapper) {
                 Object unwrapped = ((Wrapper) self).unwrap();
@@ -207,13 +157,63 @@ public final class JavaAdapter implements IdFunctionCall {
                     if (unwrapped instanceof ScriptableObject) {
                         ScriptRuntime.setObjectProtoAndParent((ScriptableObject) unwrapped, scope);
                     }
-                    return unwrapped;
+                    return (Scriptable) unwrapped;
                 }
             }
             return self;
         } catch (Exception ex) {
             throw Context.throwAsScriptRuntimeEx(ex);
         }
+    }
+
+    /**
+     * @param args JavaAdapter args to scan
+     * @param signature holder of collected information, {@link JavaAdapterSignature#superClass} and
+     *     {@link JavaAdapterSignature#interfaces} will be overwritten
+     * @return the index of JS implementation object
+     */
+    private static int fillAdapterInheritanceData(Object[] args, JavaAdapterSignature signature) {
+        var len = args.length;
+
+        int classCount;
+        for (classCount = 0; classCount < len - 1; classCount++) {
+            Object arg = args[classCount];
+            // We explicitly test for NativeObject here since checking for
+            // instanceof ScriptableObject or !(instanceof NativeJavaClass)
+            // would fail for a Java class that isn't found in the class path
+            // as NativeJavaPackage extends ScriptableObject.
+            if (arg instanceof NativeObject) {
+                break;
+            }
+            if (!(arg instanceof NativeJavaClass)) {
+                throw ScriptRuntime.typeErrorById(
+                        "msg.not.java.class.arg",
+                        String.valueOf(classCount),
+                        ScriptRuntime.toString(arg));
+            }
+        }
+        Class<?> superClass = null;
+        Class<?>[] interfaces = new Class[classCount];
+        int interfaceCount = 0;
+        for (int i = 0; i < classCount; ++i) {
+            Class<?> c = ((NativeJavaClass) args[i]).getClassObject();
+            if (c.isInterface()) {
+                interfaces[interfaceCount++] = c;
+            } else {
+                if (superClass != null) {
+                    throw ScriptRuntime.typeErrorById(
+                            "msg.only.one.super", superClass.getName(), c.getName());
+                }
+                superClass = c;
+            }
+        }
+
+        signature.superClass = superClass == null ? Object.class : superClass;
+        signature.interfaces =
+                interfaceCount == interfaces.length
+                        ? interfaces
+                        : Arrays.copyOf(interfaces, interfaceCount);
+        return classCount;
     }
 
     // Needed by NativeJavaObject serializer
@@ -233,8 +233,7 @@ public final class JavaAdapter implements IdFunctionCall {
             Object delegee = cl.getField("delegee").get(javaObject);
             out.writeObject(delegee);
             return;
-        } catch (IllegalAccessException e) {
-        } catch (NoSuchFieldException e) {
+        } catch (IllegalAccessException | NoSuchFieldException e) {
         }
         throw new IOException();
     }
@@ -250,17 +249,19 @@ public final class JavaAdapter implements IdFunctionCall {
             factory = null;
         }
 
-        Class<?> superClass = Class.forName((String) in.readObject());
+        var sig = new JavaAdapterSignature();
+        sig.superClass = Class.forName((String) in.readObject());
 
         String[] interfaceNames = (String[]) in.readObject();
-        Class<?>[] interfaces = new Class[interfaceNames.length];
+        sig.interfaces = new Class[interfaceNames.length];
 
         for (int i = 0; i < interfaceNames.length; i++)
-            interfaces[i] = Class.forName(interfaceNames[i]);
+            sig.interfaces[i] = Class.forName(interfaceNames[i]);
 
         Scriptable delegee = (Scriptable) in.readObject();
+        sig.names = getObjectFunctionNames(delegee);
 
-        Class<?> adapterClass = getAdapterClass(self, superClass, interfaces, delegee);
+        Class<?> adapterClass = getAdapterClass(self, sig);
 
         Class<?>[] ctorParms = {
             ScriptRuntime.ContextFactoryClass,
@@ -270,10 +271,10 @@ public final class JavaAdapter implements IdFunctionCall {
         Object[] ctorArgs = {factory, delegee, self};
         try {
             return adapterClass.getConstructor(ctorParms).newInstance(ctorArgs);
-        } catch (InstantiationException e) {
-        } catch (IllegalAccessException e) {
-        } catch (InvocationTargetException e) {
-        } catch (NoSuchMethodException e) {
+        } catch (InstantiationException
+                | IllegalAccessException
+                | InvocationTargetException
+                | NoSuchMethodException e) {
         }
 
         throw new ClassNotFoundException("adapter");
@@ -298,18 +299,15 @@ public final class JavaAdapter implements IdFunctionCall {
         return map;
     }
 
-    private static Class<?> getAdapterClass(
-            Scriptable scope, Class<?> superClass, Class<?>[] interfaces, Scriptable obj) {
+    private static Class<?> getAdapterClass(Scriptable scope, JavaAdapterSignature sig) {
         ClassCache cache = ClassCache.get(scope);
         Map<JavaAdapterSignature, Class<?>> generated = cache.getInterfaceAdapterCacheMap();
 
-        Map<String, Integer> names = getObjectFunctionNames(obj);
-        JavaAdapterSignature sig;
-        sig = new JavaAdapterSignature(superClass, interfaces, names);
         Class<?> adapterClass = generated.get(sig);
         if (adapterClass == null) {
             String adapterName = "adapter" + cache.newClassSerialNumber();
-            byte[] code = createAdapterCode(names, adapterName, superClass, interfaces, null);
+            byte[] code =
+                    createAdapterCode(sig.names, adapterName, sig.superClass, sig.interfaces, null);
 
             adapterClass = loadAdapterClass(adapterName, code);
             if (cache.isCachingEnabled()) {
@@ -320,6 +318,8 @@ public final class JavaAdapter implements IdFunctionCall {
     }
 
     @SuppressWarnings("AndroidJdkLibsChecker")
+    // https://developer.android.com/reference/java/lang/reflect/Method#isDefault() added in API
+    // level 24
     public static byte[] createAdapterCode(
             Map<String, Integer> functionNames,
             String adapterName,
@@ -541,7 +541,7 @@ public final class JavaAdapter implements IdFunctionCall {
             factory = ContextFactory.getGlobal();
         }
 
-        final Scriptable scope = f.getParentScope();
+        final Scriptable scope = f.getDeclarationScope();
         if (argsToWrap == 0) {
             return Context.call(factory, f, scope, thisObj, args);
         }
@@ -565,7 +565,7 @@ public final class JavaAdapter implements IdFunctionCall {
             if (0 != (argsToWrap & (1 << i))) {
                 Object arg = args[i];
                 if (!(arg instanceof Scriptable)) {
-                    args[i] = cx.getWrapFactory().wrap(cx, scope, arg, null);
+                    args[i] = cx.getWrapFactory().wrap(cx, scope, arg, TypeInfo.NONE);
                 }
             }
         }
@@ -577,7 +577,7 @@ public final class JavaAdapter implements IdFunctionCall {
                 .call(
                         cx -> {
                             ScriptableObject global = ScriptRuntime.getGlobal(cx);
-                            script.exec(cx, global);
+                            script.exec(cx, global, global);
                             return global;
                         });
     }
@@ -686,7 +686,7 @@ public final class JavaAdapter implements IdFunctionCall {
         cfw.add(ByteCode.PUTFIELD, adapterName, "self", "Lorg/mozilla/javascript/Scriptable;");
 
         cfw.add(ByteCode.RETURN);
-        cfw.stopMethod((short) 4); // 4: this + factory + delegee + self
+        cfw.stopMethod(4); // 4: this + factory + delegee + self
     }
 
     private static void generateEmptyCtor(
@@ -738,7 +738,7 @@ public final class JavaAdapter implements IdFunctionCall {
         cfw.add(ByteCode.PUTFIELD, adapterName, "self", "Lorg/mozilla/javascript/Scriptable;");
 
         cfw.add(ByteCode.RETURN);
-        cfw.stopMethod((short) 2); // this + delegee
+        cfw.stopMethod(2); // this + delegee
     }
 
     /**
@@ -1128,7 +1128,4 @@ public final class JavaAdapter implements IdFunctionCall {
         }
         return array;
     }
-
-    private static final Object FTAG = "JavaAdapter";
-    private static final int Id_JavaAdapter = 1;
 }

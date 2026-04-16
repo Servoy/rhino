@@ -114,6 +114,7 @@ public class TokenStream implements Parser.CurrentPositionReporter {
                 Id_this = Token.THIS,
                 Id_true = Token.TRUE,
                 Id_typeof = Token.TYPEOF,
+                Id_undefined = Token.UNDEFINED,
                 Id_var = Token.VAR,
                 Id_void = Token.VOID,
                 Id_while = Token.WHILE,
@@ -221,6 +222,9 @@ public class TokenStream implements Parser.CurrentPositionReporter {
                 break;
             case "typeof":
                 id = Id_typeof;
+                break;
+            case "undefined":
+                id = Id_undefined;
                 break;
             case "var":
                 id = Id_var;
@@ -407,6 +411,7 @@ public class TokenStream implements Parser.CurrentPositionReporter {
                 Id_false = Token.FALSE,
                 Id_null = Token.NULL,
                 Id_true = Token.TRUE,
+                Id_undefined = Token.UNDEFINED,
 
                 // Non ReservedWord, but Non IdentifierName in strict mode code.
                 // 12.1.1 Static Semantics: Early Errors
@@ -556,6 +561,9 @@ public class TokenStream implements Parser.CurrentPositionReporter {
             case "null":
                 id = Id_null;
                 break;
+            case "undefined":
+                id = Id_undefined;
+                break;
             case "true":
                 id = Id_true;
                 break;
@@ -577,11 +585,11 @@ public class TokenStream implements Parser.CurrentPositionReporter {
         return id & 0xff;
     }
 
-    @SuppressWarnings("AndroidJdkLibsChecker")
     private static boolean isValidIdentifierName(String str) {
         int i = 0;
-        for (int c : str.codePoints().toArray()) {
-            if (i++ == 0) {
+        while (i < str.length()) {
+            int c = str.codePointAt(i);
+            if (i == 0) {
                 if (c != '$' && c != '_' && !Character.isUnicodeIdentifierStart(c)) {
                     return false;
                 }
@@ -593,6 +601,7 @@ public class TokenStream implements Parser.CurrentPositionReporter {
                     return false;
                 }
             }
+            i += Character.charCount(c);
         }
         return true;
     }
@@ -771,9 +780,15 @@ public class TokenStream implements Parser.CurrentPositionReporter {
                         }
                     }
                 }
-                ungetChar(c);
 
-                String str = getStringFromBuffer();
+                // `ungetChar` will decrement the cursor, however the _actual_ tokenEnd should
+                // still be restored correctly after `getStringFromBuffer()` mutates it, so we save
+                // and restore it.
+                int savedTokenEnd = cursor;
+                ungetChar(c); // decrements cursor
+                String str = getStringFromBuffer(); // mutates tokenEnd to point to cursor
+                tokenEnd = savedTokenEnd; // restore tokenEnd
+
                 if (!containsEscape
                         || parser.getCompilerEnv().getLanguageVersion() >= Context.VERSION_ES6) {
                     // OPT we shouldn't have to make a string (object!) to
@@ -1563,6 +1578,7 @@ public class TokenStream implements Parser.CurrentPositionReporter {
             else if (matchChar('m')) addToString('m');
             else if (matchChar('s')) addToString('s');
             else if (matchChar('y')) addToString('y');
+            else if (matchChar('u')) addToString('u');
             else break;
         }
         tokenEnd = start + stringBufferTop + 2; // include slashes
@@ -2253,9 +2269,19 @@ public class TokenStream implements Parser.CurrentPositionReporter {
         // skip to end of line
         int c;
         while ((c = getChar()) != EOF_CHAR && c != '\n') {}
-        ungetChar(c);
-        cursor = c == '\n' ? sourceCursor - Character.charCount(c) : sourceCursor;
-        tokenEnd = cursor;
+        if (c == EOF_CHAR) {
+            // If we've hit EOF, the cursor hasn't been incremented, so we need to save tokenEnd
+            // _before_ ungetChar
+            tokenEnd = cursor;
+            ungetChar(c);
+        } else {
+            // If we've hit a newline, the cursor has been incremented past it, and ungetChar will
+            // point at the newline, so saving tokenEnd after ungetChar will correctly exclude the
+            // newline
+            ungetChar(c);
+            cursor = c == '\n' ? sourceCursor - Character.charCount(c) : sourceCursor;
+            tokenEnd = cursor;
+        }
     }
 
     /** Returns the offset into the current line. */

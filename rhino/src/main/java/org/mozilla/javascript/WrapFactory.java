@@ -11,6 +11,8 @@ package org.mozilla.javascript;
 import java.math.BigInteger;
 import java.util.List;
 import java.util.Map;
+import org.mozilla.javascript.lc.type.TypeInfo;
+import org.mozilla.javascript.lc.type.TypeInfoFactory;
 
 /**
  * Embeddings that wish to provide their own custom wrappings for Java objects may extend this class
@@ -45,12 +47,19 @@ public class WrapFactory {
      * @return the wrapped value.
      */
     public Object wrap(Context cx, Scriptable scope, Object obj, Class<?> staticType) {
+        return wrap(cx, scope, obj, TypeInfoFactory.GLOBAL.create(staticType));
+    }
+
+    public Object wrap(Context cx, Scriptable scope, Object obj, TypeInfo staticType) {
         if (obj == null || obj == Undefined.instance || obj instanceof Scriptable) {
             return obj;
         }
-        if (staticType != null && staticType.isPrimitive()) {
-            if (staticType == Void.TYPE) return Undefined.instance;
-            if (staticType == Character.TYPE) return Integer.valueOf(((Character) obj).charValue());
+        if (staticType.isPrimitive()) {
+            if (staticType == TypeInfo.PRIMITIVE_VOID) {
+                return Undefined.instance;
+            } else if (staticType == TypeInfo.PRIMITIVE_CHARACTER) {
+                return (int) (Character) obj;
+            }
             return obj;
         }
         if (!isJavaPrimitiveWrap()) {
@@ -68,10 +77,6 @@ public class WrapFactory {
                 return String.valueOf(((Character) obj).charValue());
             }
         }
-        Class<?> cls = obj.getClass();
-        if (cls.isArray()) {
-            return NativeJavaArray.wrap(scope, obj);
-        }
         return wrapAsJavaObject(cx, scope, obj, staticType);
     }
 
@@ -87,11 +92,7 @@ public class WrapFactory {
         if (obj instanceof Scriptable) {
             return (Scriptable) obj;
         }
-        Class<?> cls = obj.getClass();
-        if (cls.isArray()) {
-            return NativeJavaArray.wrap(scope, obj);
-        }
-        return wrapAsJavaObject(cx, scope, obj, null);
+        return wrapAsJavaObject(cx, scope, obj, TypeInfo.NONE);
     }
 
     /**
@@ -99,7 +100,7 @@ public class WrapFactory {
      * JavaScript.
      *
      * <p>{@link #wrap(Context, Scriptable, Object, Class)} and {@link #wrapNewObject(Context,
-     * Scriptable, Object)} call this method when they can not convert <code>javaObject</code> to
+     * Scriptable, Object)} call this method when they can not convert {@code javaObject} to
      * JavaScript primitive value or JavaScript array.
      *
      * <p>Subclasses can override the method to provide custom wrappers for Java objects.
@@ -113,10 +114,22 @@ public class WrapFactory {
      */
     public Scriptable wrapAsJavaObject(
             Context cx, Scriptable scope, Object javaObject, Class<?> staticType) {
-        if (List.class.isAssignableFrom(javaObject.getClass())) {
-            return new NativeJavaList(scope, javaObject);
-        } else if (Map.class.isAssignableFrom(javaObject.getClass())) {
-            return new NativeJavaMap(scope, javaObject);
+        return wrapAsJavaObject(cx, scope, javaObject, TypeInfoFactory.GLOBAL.create(staticType));
+    }
+
+    public Scriptable wrapAsJavaObject(
+            Context cx, Scriptable scope, Object javaObject, TypeInfo staticType) {
+        if (staticType.shouldReplace() && javaObject != null) {
+            staticType =
+                    TypeInfoFactory.getOrElse(scope, TypeInfoFactory.GLOBAL)
+                            .create(javaObject.getClass());
+        }
+        if (List.class.isAssignableFrom(staticType.asClass())) {
+            return new NativeJavaList(scope, javaObject, staticType);
+        } else if (Map.class.isAssignableFrom(staticType.asClass())) {
+            return new NativeJavaMap(scope, javaObject, staticType);
+        } else if (staticType.isArray()) {
+            return new NativeJavaArray(scope, javaObject, staticType);
         }
         return new NativeJavaObject(scope, javaObject, staticType);
     }
@@ -138,12 +151,12 @@ public class WrapFactory {
     }
 
     /**
-     * Return <code>false</code> if result of Java method, which is instance of <code>String</code>,
-     * <code>Number</code>, <code>Boolean</code> and <code>Character</code>, should be used directly
-     * as JavaScript primitive type. By default the method returns true to indicate that instances
-     * of <code>String</code>, <code>Number</code>, <code>Boolean</code> and <code>Character</code>
-     * should be wrapped as any other Java object and scripts can access any Java method available
-     * in these objects. Use {@link #setJavaPrimitiveWrap(boolean)} to change this.
+     * Return {@code false} if result of Java method, which is instance of {@code String}, {@code
+     * Number}, {@code Boolean} and {@code Character}, should be used directly as JavaScript
+     * primitive type. By default the method returns true to indicate that instances of {@code
+     * String}, {@code Number}, {@code Boolean} and {@code Character} should be wrapped as any other
+     * Java object and scripts can access any Java method available in these objects. Use {@link
+     * #setJavaPrimitiveWrap(boolean)} to change this.
      */
     public final boolean isJavaPrimitiveWrap() {
         return javaPrimitiveWrap;

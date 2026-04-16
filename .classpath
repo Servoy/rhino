@@ -20,6 +20,7 @@
 	</classpathentry>
 	<classpathentry kind="lib" path="test-libs/junit-4.13.2.jar"/>
 	<classpathentry kind="lib" path="test-libs/hamcrest-3.0.jar"/>
-	<classpathentry kind="lib" path="test-libs/junit-jupiter-api-5.12.2.jar"/>
+	<classpathentry kind="lib" path="test-libs/junit-jupiter-api-6.0.3.jar"/>
+	<classpathentry kind="lib" path="test-libs/junit-jupiter-params-6.0.3.jar"/>
 	<classpathentry kind="output" path="bin"/>
 </classpath>

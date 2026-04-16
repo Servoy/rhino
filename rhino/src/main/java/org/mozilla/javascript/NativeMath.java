@@ -25,41 +25,42 @@ final class NativeMath extends ScriptableObject {
 
         math.defineProperty("toSource", "Math", DONTENUM | READONLY | PERMANENT);
 
-        math.defineProperty(scope, "abs", 1, NativeMath::abs, DONTENUM, DONTENUM | READONLY);
-        math.defineProperty(scope, "acos", 1, NativeMath::acos, DONTENUM, DONTENUM | READONLY);
-        math.defineProperty(scope, "acosh", 1, NativeMath::acosh, DONTENUM, DONTENUM | READONLY);
-        math.defineProperty(scope, "asin", 1, NativeMath::asin, DONTENUM, DONTENUM | READONLY);
-        math.defineProperty(scope, "asinh", 1, NativeMath::asinh, DONTENUM, DONTENUM | READONLY);
-        math.defineProperty(scope, "atan", 1, NativeMath::atan, DONTENUM, DONTENUM | READONLY);
-        math.defineProperty(scope, "atanh", 1, NativeMath::atanh, DONTENUM, DONTENUM | READONLY);
-        math.defineProperty(scope, "atan2", 2, NativeMath::atan2, DONTENUM, DONTENUM | READONLY);
-        math.defineProperty(scope, "cbrt", 1, NativeMath::cbrt, DONTENUM, DONTENUM | READONLY);
-        math.defineProperty(scope, "ceil", 1, NativeMath::ceil, DONTENUM, DONTENUM | READONLY);
-        math.defineProperty(scope, "clz32", 1, NativeMath::clz32, DONTENUM, DONTENUM | READONLY);
-        math.defineProperty(scope, "cos", 1, NativeMath::cos, DONTENUM, DONTENUM | READONLY);
-        math.defineProperty(scope, "cosh", 1, NativeMath::cosh, DONTENUM, DONTENUM | READONLY);
-        math.defineProperty(scope, "exp", 1, NativeMath::exp, DONTENUM, DONTENUM | READONLY);
-        math.defineProperty(scope, "expm1", 1, NativeMath::expm1, DONTENUM, DONTENUM | READONLY);
-        math.defineProperty(scope, "floor", 1, NativeMath::floor, DONTENUM, DONTENUM | READONLY);
-        math.defineProperty(scope, "fround", 1, NativeMath::fround, DONTENUM, DONTENUM | READONLY);
-        math.defineProperty(scope, "hypot", 2, NativeMath::hypot, DONTENUM, DONTENUM | READONLY);
-        math.defineProperty(scope, "imul", 2, NativeMath::imul, DONTENUM, DONTENUM | READONLY);
-        math.defineProperty(scope, "log", 1, NativeMath::log, DONTENUM, DONTENUM | READONLY);
-        math.defineProperty(scope, "log1p", 1, NativeMath::log1p, DONTENUM, DONTENUM | READONLY);
-        math.defineProperty(scope, "log10", 1, NativeMath::log10, DONTENUM, DONTENUM | READONLY);
-        math.defineProperty(scope, "log2", 1, NativeMath::log2, DONTENUM, DONTENUM | READONLY);
-        math.defineProperty(scope, "max", 2, NativeMath::max, DONTENUM, DONTENUM | READONLY);
-        math.defineProperty(scope, "min", 2, NativeMath::min, DONTENUM, DONTENUM | READONLY);
-        math.defineProperty(scope, "pow", 2, NativeMath::pow, DONTENUM, DONTENUM | READONLY);
-        math.defineProperty(scope, "random", 0, NativeMath::random, DONTENUM, DONTENUM | READONLY);
-        math.defineProperty(scope, "round", 1, NativeMath::round, DONTENUM, DONTENUM | READONLY);
-        math.defineProperty(scope, "sign", 1, NativeMath::sign, DONTENUM, DONTENUM | READONLY);
-        math.defineProperty(scope, "sin", 1, NativeMath::sin, DONTENUM, DONTENUM | READONLY);
-        math.defineProperty(scope, "sinh", 1, NativeMath::sinh, DONTENUM, DONTENUM | READONLY);
-        math.defineProperty(scope, "sqrt", 1, NativeMath::sqrt, DONTENUM, DONTENUM | READONLY);
-        math.defineProperty(scope, "tan", 1, NativeMath::tan, DONTENUM, DONTENUM | READONLY);
-        math.defineProperty(scope, "tanh", 1, NativeMath::tanh, DONTENUM, DONTENUM | READONLY);
-        math.defineProperty(scope, "trunc", 1, NativeMath::trunc, DONTENUM, DONTENUM | READONLY);
+        math.defineBuiltinProperty(scope, "abs", 1, NativeMath::abs);
+        math.defineBuiltinProperty(scope, "acos", 1, NativeMath::acos);
+        math.defineBuiltinProperty(scope, "acosh", 1, NativeMath::acosh);
+        math.defineBuiltinProperty(scope, "asin", 1, NativeMath::asin);
+        math.defineBuiltinProperty(scope, "asinh", 1, NativeMath::asinh);
+        math.defineBuiltinProperty(scope, "atan", 1, NativeMath::atan);
+        math.defineBuiltinProperty(scope, "atanh", 1, NativeMath::atanh);
+        math.defineBuiltinProperty(scope, "atan2", 2, NativeMath::atan2);
+        math.defineBuiltinProperty(scope, "cbrt", 1, NativeMath::cbrt);
+        math.defineBuiltinProperty(scope, "ceil", 1, NativeMath::ceil);
+        math.defineBuiltinProperty(scope, "clz32", 1, NativeMath::clz32);
+        math.defineBuiltinProperty(scope, "cos", 1, NativeMath::cos);
+        math.defineBuiltinProperty(scope, "cosh", 1, NativeMath::cosh);
+        math.defineBuiltinProperty(scope, "exp", 1, NativeMath::exp);
+        math.defineBuiltinProperty(scope, "expm1", 1, NativeMath::expm1);
+        math.defineBuiltinProperty(scope, "f16round", 1, NativeMath::f16round);
+        math.defineBuiltinProperty(scope, "floor", 1, NativeMath::floor);
+        math.defineBuiltinProperty(scope, "fround", 1, NativeMath::fround);
+        math.defineBuiltinProperty(scope, "hypot", 2, NativeMath::hypot);
+        math.defineBuiltinProperty(scope, "imul", 2, NativeMath::imul);
+        math.defineBuiltinProperty(scope, "log", 1, NativeMath::log);
+        math.defineBuiltinProperty(scope, "log1p", 1, NativeMath::log1p);
+        math.defineBuiltinProperty(scope, "log10", 1, NativeMath::log10);
+        math.defineBuiltinProperty(scope, "log2", 1, NativeMath::log2);
+        math.defineBuiltinProperty(scope, "max", 2, NativeMath::max);
+        math.defineBuiltinProperty(scope, "min", 2, NativeMath::min);
+        math.defineBuiltinProperty(scope, "pow", 2, NativeMath::pow);
+        math.defineBuiltinProperty(scope, "random", 0, NativeMath::random);
+        math.defineBuiltinProperty(scope, "round", 1, NativeMath::round);
+        math.defineBuiltinProperty(scope, "sign", 1, NativeMath::sign);
+        math.defineBuiltinProperty(scope, "sin", 1, NativeMath::sin);
+        math.defineBuiltinProperty(scope, "sinh", 1, NativeMath::sinh);
+        math.defineBuiltinProperty(scope, "sqrt", 1, NativeMath::sqrt);
+        math.defineBuiltinProperty(scope, "tan", 1, NativeMath::tan);
+        math.defineBuiltinProperty(scope, "tanh", 1, NativeMath::tanh);
+        math.defineBuiltinProperty(scope, "trunc", 1, NativeMath::trunc);
 
         math.defineProperty("E", Math.E, DONTENUM | READONLY | PERMANENT);
         math.defineProperty("PI", Math.PI, DONTENUM | READONLY | PERMANENT);
@@ -244,6 +245,152 @@ final class NativeMath extends ScriptableObject {
         double x = ScriptRuntime.toNumber(args, 0);
         x = Math.floor(x);
         return ScriptRuntime.wrapNumber(x);
+    }
+
+    private static Object f16round(
+            Context cx, Scriptable scope, Scriptable thisObj, Object[] args) {
+        // Handle missing arguments
+        if (args.length == 0) {
+            return ScriptRuntime.NaNobj;
+        }
+        double x = ScriptRuntime.toNumber(args[0]);
+
+        // Handle special cases
+        if (Double.isNaN(x)) return ScriptRuntime.NaNobj;
+        if (x == 0.0) return ScriptRuntime.wrapNumber(x); // Preserve sign of zero
+        if (Double.isInfinite(x)) return ScriptRuntime.wrapNumber(x);
+
+        // Extract components from double precision
+        long bits = Double.doubleToLongBits(x);
+        int sign = (int) (bits >>> 63);
+        int exponent = (int) ((bits >>> 52) & 0x7FF);
+        long mantissa = bits & 0x000FFFFFFFFFFFFFL;
+
+        // Adjust from double bias (1023) to float16 bias (15)
+        exponent = exponent - 1023 + 15;
+
+        // Handle overflow to infinity
+        if (exponent >= 31) {
+            return ScriptRuntime.wrapNumber(
+                    (sign != 0) ? Double.NEGATIVE_INFINITY : Double.POSITIVE_INFINITY);
+        }
+
+        // Handle underflow and subnormal values
+        if (exponent < 0) {
+            return handleSubnormalF16(sign, exponent, mantissa);
+        }
+
+        // Normal value: round mantissa from 52 to 10 bits
+        return handleNormalF16(sign, exponent, mantissa);
+    }
+
+    private static Object handleSubnormalF16(int sign, int exponent, long mantissa) {
+        // Values below 2^-24 underflow to zero
+        if (exponent < -10) {
+            return ScriptRuntime.wrapNumber((sign != 0) ? -0.0 : 0.0);
+        }
+
+        // Special case: exactly 2^-25 rounds to zero (ties-to-even)
+        if (exponent == -10 && mantissa == 0) {
+            return ScriptRuntime.wrapNumber((sign != 0) ? -0.0 : 0.0);
+        }
+
+        // Special case: slightly above 2^-25 rounds to 2^-24
+        if (exponent == -10 && mantissa > 0) {
+            double smallestSubnormal = 0x1.0p-24; // 2^-24
+            return ScriptRuntime.wrapNumber((sign != 0) ? -smallestSubnormal : smallestSubnormal);
+        }
+
+        // Convert to subnormal representation
+        int totalShift = 42 + (1 - exponent);
+        mantissa = mantissa | (1L << 52); // Add implicit 1 bit
+
+        // Extract rounding information before shift
+        long roundBit = (mantissa >> (totalShift - 1)) & 1;
+        long stickyBits = mantissa & ((1L << (totalShift - 1)) - 1);
+
+        // Shift to get 10-bit mantissa
+        mantissa >>>= totalShift;
+
+        // Apply ties-to-even rounding
+        if (roundBit == 1 && (stickyBits != 0 || (mantissa & 1) == 1)) {
+            mantissa++;
+        }
+
+        // Reconstruct subnormal value
+        if (mantissa == 0) {
+            return ScriptRuntime.wrapNumber((sign != 0) ? -0.0 : 0.0);
+        }
+
+        // Check for overflow to normal range
+        if (mantissa >= (1L << 10)) {
+            // Smallest normal = 2^-14
+            return ScriptRuntime.wrapNumber((sign != 0) ? -6.103515625e-5 : 6.103515625e-5);
+        }
+
+        // Subnormal value = 2^-14 * (mantissa / 1024)
+        double value = Math.scalb((double) mantissa / 1024.0, -14);
+        return ScriptRuntime.wrapNumber((sign != 0) ? -value : value);
+    }
+
+    private static Object handleNormalF16(int sign, int exponent, long mantissa) {
+        // Add implicit 1 bit for normal values
+        long fullMantissa = mantissa | (1L << 52);
+
+        // Extract rounding information
+        long roundBit = (fullMantissa >> 41) & 1;
+        long stickyBits = fullMantissa & ((1L << 41) - 1);
+        fullMantissa >>>= 42;
+
+        // Handle boundary between largest subnormal and smallest normal
+        if (exponent == 0) {
+            if (fullMantissa == 2046) {
+                // Exactly the largest subnormal
+                return reconstructSubnormalF16(sign, 1023);
+            } else if (fullMantissa == 2047 && roundBit == 0 && stickyBits == 0) {
+                // Midpoint: ties-to-even rounds to smallest normal
+                return reconstructNormalF16(sign, 1, 0);
+            }
+        }
+
+        // Extract 10-bit mantissa (remove implicit 1)
+        mantissa = fullMantissa & 0x3FF;
+
+        // Apply ties-to-even rounding
+        if (roundBit == 1 && (stickyBits != 0 || (mantissa & 1) == 1)) {
+            mantissa++;
+        }
+
+        // Handle mantissa overflow
+        if (mantissa >= (1L << 10)) {
+            mantissa = 0;
+            exponent++;
+            if (exponent >= 31) {
+                return ScriptRuntime.wrapNumber(
+                        (sign != 0) ? Double.NEGATIVE_INFINITY : Double.POSITIVE_INFINITY);
+            }
+        }
+
+        // Reconstruct the value
+        if (exponent == 0) {
+            return reconstructSubnormalF16(sign, mantissa);
+        } else {
+            return reconstructNormalF16(sign, exponent, mantissa);
+        }
+    }
+
+    private static Object reconstructSubnormalF16(int sign, long mantissa) {
+        if (mantissa == 0) {
+            return ScriptRuntime.wrapNumber((sign != 0) ? -0.0 : 0.0);
+        }
+        double value = Math.scalb((double) mantissa / 1024.0, -14);
+        return ScriptRuntime.wrapNumber((sign != 0) ? -value : value);
+    }
+
+    private static Object reconstructNormalF16(int sign, int exponent, long mantissa) {
+        long resultBits =
+                ((long) sign << 63) | (((long) (exponent + 1023 - 15)) << 52) | (mantissa << 42);
+        return ScriptRuntime.wrapNumber(Double.longBitsToDouble(resultBits));
     }
 
     private static Object fround(Context cx, Scriptable scope, Scriptable thisObj, Object[] args) {

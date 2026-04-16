@@ -6,6 +6,7 @@ import static org.mozilla.javascript.Scriptable.NOT_FOUND;
 
 import java.io.Serializable;
 import java.util.Comparator;
+import org.mozilla.javascript.ScriptableObject.DescriptorInfo;
 
 /** Contains implementation of shared methods useful for arrays and typed arrays. */
 public class ArrayLikeAbstractOperations {
@@ -26,6 +27,10 @@ public class ArrayLikeAbstractOperations {
         REDUCE_RIGHT,
     }
 
+    public interface LengthAccessor {
+        public long getLength(Context cx, Scriptable o);
+    }
+
     /**
      * Implements the methods "every", "filter", "forEach", "map", and "some" without using an
      * IdFunctionObject.
@@ -35,8 +40,9 @@ public class ArrayLikeAbstractOperations {
             IterativeOperation operation,
             Scriptable scope,
             Scriptable thisObj,
-            Object[] args) {
-        return iterativeMethod(cx, null, operation, scope, thisObj, args, true);
+            Object[] args,
+            LengthAccessor lengthAccessor) {
+        return iterativeMethod(cx, null, operation, scope, thisObj, args, lengthAccessor, true);
     }
 
     /**
@@ -49,8 +55,9 @@ public class ArrayLikeAbstractOperations {
             IterativeOperation operation,
             Scriptable scope,
             Scriptable thisObj,
-            Object[] args) {
-        return iterativeMethod(cx, fun, operation, scope, thisObj, args, false);
+            Object[] args,
+            LengthAccessor lengthAccessor) {
+        return iterativeMethod(cx, fun, operation, scope, thisObj, args, lengthAccessor, false);
     }
 
     private static Object iterativeMethod(
@@ -60,6 +67,7 @@ public class ArrayLikeAbstractOperations {
             Scriptable scope,
             Scriptable thisObj,
             Object[] args,
+            LengthAccessor lengthAccessor,
             boolean skipCoercibleCheck) {
         Scriptable o = ScriptRuntime.toObject(cx, scope, thisObj);
 
@@ -72,7 +80,55 @@ public class ArrayLikeAbstractOperations {
             }
         }
 
-        long length = getLengthProperty(cx, o);
+        long length = lengthAccessor.getLength(cx, o);
+        return coercibleIterativeMethod(cx, operation, scope, o, args, length);
+    }
+
+    public static Object iterativeMethod(
+            Context cx,
+            Object tag,
+            String name,
+            IterativeOperation operation,
+            Scriptable scope,
+            Scriptable thisObj,
+            Object[] args,
+            LengthAccessor lengthAccessor) {
+        return iterativeMethod(
+                cx, tag, name, operation, scope, thisObj, args, lengthAccessor, false);
+    }
+
+    private static Object iterativeMethod(
+            Context cx,
+            Object tag,
+            String name,
+            IterativeOperation operation,
+            Scriptable scope,
+            Scriptable thisObj,
+            Object[] args,
+            LengthAccessor lengthAccessor,
+            boolean skipCoercibleCheck) {
+        Scriptable o = ScriptRuntime.toObject(cx, scope, thisObj);
+
+        if (!skipCoercibleCheck) {
+            if (IterativeOperation.FIND == operation
+                    || IterativeOperation.FIND_INDEX == operation
+                    || IterativeOperation.FIND_LAST == operation
+                    || IterativeOperation.FIND_LAST_INDEX == operation) {
+                requireObjectCoercible(cx, o, tag, name);
+            }
+        }
+
+        long length = lengthAccessor.getLength(cx, o);
+        return coercibleIterativeMethod(cx, operation, scope, o, args, length);
+    }
+
+    public static Object coercibleIterativeMethod(
+            Context cx,
+            IterativeOperation operation,
+            Scriptable scope,
+            Scriptable o,
+            Object[] args,
+            long length) {
         if (operation == IterativeOperation.MAP && length > Integer.MAX_VALUE) {
             String msg = ScriptRuntime.getMessageById("msg.arraylength.bad");
             throw ScriptRuntime.rangeError(msg);
@@ -92,7 +148,7 @@ public class ArrayLikeAbstractOperations {
         Scriptable array = null;
         if (operation == IterativeOperation.FILTER || operation == IterativeOperation.MAP) {
             int resultLength = operation == IterativeOperation.MAP ? (int) length : 0;
-            array = cx.newArray(scope, resultLength);
+            array = arraySpeciesCreate(cx, scope, o, resultLength);
         }
         long j = 0;
         long start =
@@ -170,6 +226,28 @@ public class ArrayLikeAbstractOperations {
         }
     }
 
+    static Scriptable arraySpeciesCreate(Context cx, Scriptable scope, Scriptable o, int length) {
+        if (o instanceof NativeArray) {
+            Object c = ScriptableObject.getProperty(o, "constructor");
+            if (c instanceof Scriptable) {
+                c = ScriptableObject.getProperty((Scriptable) c, SymbolKey.SPECIES);
+                if (c == null || c == NOT_FOUND) {
+                    c = Undefined.instance;
+                }
+            }
+
+            if (!Undefined.isUndefined(c)) {
+                if (c instanceof Constructable) {
+                    return ((Constructable) c)
+                            .construct(cx, scope, new Object[] {Double.valueOf(length)});
+                } else {
+                    throw ScriptRuntime.typeErrorById("msg.ctor.not.found", o);
+                }
+            }
+        }
+        return cx.newArray(scope, length);
+    }
+
     static Function getCallbackArg(Context cx, Object callbackArg) {
         if (!(callbackArg instanceof Function)) {
             throw ScriptRuntime.notFunctionError(callbackArg);
@@ -195,6 +273,13 @@ public class ArrayLikeAbstractOperations {
     }
 
     static void defineElem(Context cx, Scriptable target, long index, Object value) {
+        if (!(target instanceof NativeArray && ((NativeArray) target).getDenseOnly())
+                && target instanceof ScriptableObject) {
+            var so = (ScriptableObject) target;
+            var desc = new DescriptorInfo(true, true, true, value);
+            so.defineOwnProperty(cx, index, desc);
+            return;
+        }
         if (index > Integer.MAX_VALUE) {
             String id = Long.toString(index);
             target.put(id, target, value);
@@ -205,7 +290,7 @@ public class ArrayLikeAbstractOperations {
 
     // same as NativeArray::getElem, but without converting NOT_FOUND to undefined
     static Object getRawElem(Scriptable target, long index) {
-        if (index > Integer.MAX_VALUE) {
+        if (index < 0 || index > Integer.MAX_VALUE) {
             return ScriptableObject.getProperty(target, Long.toString(index));
         }
         return ScriptableObject.getProperty(target, (int) index);
@@ -237,6 +322,17 @@ public class ArrayLikeAbstractOperations {
         Scriptable o = ScriptRuntime.toObject(cx, scope, thisObj);
 
         long length = getLengthProperty(cx, o);
+        return reduceMethodWithLength(cx, operation, scope, o, args, length);
+    }
+
+    public static Object reduceMethodWithLength(
+            Context cx,
+            ReduceOperation operation,
+            Scriptable scope,
+            Scriptable o,
+            Object[] args,
+            long length) {
+
         Object callbackArg = args.length > 0 ? args[0] : Undefined.instance;
         if (callbackArg == null || !(callbackArg instanceof Function)) {
             throw ScriptRuntime.notFunctionError(callbackArg);
@@ -278,26 +374,24 @@ public class ArrayLikeAbstractOperations {
 
     public static ElementComparator getSortComparatorFromArguments(
             Context cx, Scriptable scope, Object[] args) {
-        final Callable jsCompareFunction = ScriptRuntime.getValueFunctionAndThis(args[0], cx);
-        final Scriptable funThis = ScriptRuntime.lastStoredScriptable(cx);
+        var compareFunc = ScriptRuntime.getValueAndThis(args[0], cx);
+        Callable compare = compareFunc.getCallable();
+        Scriptable compareThis = compareFunc.getThis();
         final Object[] cmpBuf = new Object[2]; // Buffer for cmp arguments
         return new ElementComparator(
-                new Comparator<Object>() {
-                    @Override
-                    public int compare(final Object x, final Object y) {
-                        // This comparator is invoked only for non-undefined objects
-                        cmpBuf[0] = x;
-                        cmpBuf[1] = y;
-                        Object ret = jsCompareFunction.call(cx, scope, funThis, cmpBuf);
-                        double d = ScriptRuntime.toNumber(ret);
-                        int cmp = Double.compare(d, 0);
-                        if (cmp < 0) {
-                            return -1;
-                        } else if (cmp > 0) {
-                            return +1;
-                        }
-                        return 0;
+                (x, y) -> {
+                    // This comparator is invoked only for non-undefined objects
+                    cmpBuf[0] = x;
+                    cmpBuf[1] = y;
+                    Object ret = compare.call(cx, scope, compareThis, cmpBuf);
+                    double d = ScriptRuntime.toNumber(ret);
+                    int cmp = Double.compare(d, 0);
+                    if (cmp < 0) {
+                        return -1;
+                    } else if (cmp > 0) {
+                        return +1;
                     }
+                    return 0;
                 });
     }
 

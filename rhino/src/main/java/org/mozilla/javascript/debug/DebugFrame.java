@@ -24,10 +24,10 @@ public interface DebugFrame {
      *
      * @param cx current Context for this thread
      * @param activation the activation scope for the function or script.
-     * @param thisObj value of the JavaScript <code>this</code> object
+     * @param thisObj value of the JavaScript {@code this} object
      * @param args the array of arguments
      */
-    public void onEnter(Context cx, Scriptable activation, Scriptable thisObj, Object[] args);
+    default void onEnter(Context cx, Scriptable activation, Scriptable thisObj, Object[] args) {}
 
     /**
      * Called when executed code reaches new line in the source.
@@ -35,7 +35,7 @@ public interface DebugFrame {
      * @param cx current Context for this thread
      * @param lineNumber current line number in the script source
      */
-    public void onLineChange(Context cx, int lineNumber);
+    default void onLineChange(Context cx, int lineNumber) {}
 
     /**
      * Called when thrown exception is handled by the function or script.
@@ -43,7 +43,7 @@ public interface DebugFrame {
      * @param cx current Context for this thread
      * @param ex exception object
      */
-    public void onExceptionThrown(Context cx, Throwable ex);
+    default void onExceptionThrown(Context cx, Throwable ex) {}
 
     /**
      * Called when the function or script for this frame is about to return.
@@ -54,16 +54,12 @@ public interface DebugFrame {
      * @param resultOrException function result in case of normal return or exception object if
      *     about to throw exception
      */
-    public void onExit(Context cx, boolean byThrow, Object resultOrException);
+    default void onExit(Context cx, boolean byThrow, Object resultOrException) {}
 
     /**
      * Called when the function or script executes a 'debugger' statement.
      *
      * @param cx current Context for this thread
      */
-    public void onDebuggerStatement(Context cx);
-    
-    public void onNativeWithEnter(Context cx, NativeWith withScope);
-    
-    public void onNativeWithExit(Context cx, NativeWith withScope);
+    default void onDebuggerStatement(Context cx) {}
 }

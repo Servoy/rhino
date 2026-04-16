@@ -2,7 +2,6 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-/** */
 package org.mozilla.javascript.tests;
 
 import static org.junit.Assert.assertEquals;
@@ -164,7 +163,7 @@ public class JavaAcessibilityTest {
         return contextFactory.call(
                 context -> {
                     Script script = context.compileString(scriptSourceText, "", 1, null);
-                    return script.exec(context, global);
+                    return script.exec(context, global, global);
                 });
     }
 }

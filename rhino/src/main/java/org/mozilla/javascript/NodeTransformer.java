@@ -339,11 +339,9 @@ public class NodeTransformer {
                             if (child.getType() == Token.EQ || child.getType() == Token.NE) {
                                 Node first = child.getFirstChild();
                                 Node last = child.getLastChild();
-                                if (first.getType() == Token.NAME
-                                        && first.getString().equals("undefined")) {
+                                if (first.getType() == Token.UNDEFINED) {
                                     child = last;
-                                } else if (last.getType() == Token.NAME
-                                        && last.getString().equals("undefined")) {
+                                } else if (last.getType() == Token.UNDEFINED) {
                                     child = first;
                                 }
                             }
@@ -360,7 +358,7 @@ public class NodeTransformer {
                         if (node.getFirstChild().getType() == Token.BINDNAME) {
                             Node name = node.getFirstChild();
                             if (name instanceof Name
-                                    && ((Name) name).getIdentifier().equals("eval")) {
+                                    && "eval".equals(((Name) name).getIdentifier())) {
                                 // Don't allow set of `eval` in strict mode
                                 reportError("syntax error");
                             }

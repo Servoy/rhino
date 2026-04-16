@@ -145,6 +145,9 @@ final class EqualObjectGraphs {
         } else if (o1 instanceof NativeJavaTopPackage) {
             // stateless objects, must check before Scriptable
             return o2 instanceof NativeJavaTopPackage;
+        } else if (o1 instanceof ScriptOrFn) {
+            return o2 instanceof ScriptOrFn
+                    && equalJSFunctions((ScriptOrFn<?>) o1, (ScriptOrFn<?>) o2);
         } else if (o1 instanceof Scriptable) {
             return o2 instanceof Scriptable && equalScriptables((Scriptable) o1, (Scriptable) o2);
         } else if (o1 instanceof SymbolKey) {
@@ -199,14 +202,6 @@ final class EqualObjectGraphs {
             return s2 instanceof IdFunctionObject
                     && IdFunctionObject.equalObjectGraphs(
                             (IdFunctionObject) s1, (IdFunctionObject) s2, this);
-        } else if (s1 instanceof InterpretedFunction) {
-            return s2 instanceof InterpretedFunction
-                    && equalInterpretedFunctions(
-                            (InterpretedFunction) s1, (InterpretedFunction) s2);
-        } else if (s1 instanceof ArrowFunction) {
-            return s2 instanceof ArrowFunction
-                    && ArrowFunction.equalObjectGraphs(
-                            (ArrowFunction) s1, (ArrowFunction) s2, this);
         } else if (s1 instanceof BoundFunction) {
             return s2 instanceof BoundFunction
                     && BoundFunction.equalObjectGraphs(
@@ -285,9 +280,8 @@ final class EqualObjectGraphs {
         return a;
     }
 
-    private static boolean equalInterpretedFunctions(
-            final InterpretedFunction f1, final InterpretedFunction f2) {
-        return Objects.equals(f1.getRawSource(), f2.getRawSource());
+    private static boolean equalJSFunctions(final ScriptOrFn<?> f1, final ScriptOrFn<?> f2) {
+        return Objects.equals(f1.getDescriptor().getRawSource(), f2.getDescriptor().getRawSource());
     }
 
     // Sort IDs deterministically
@@ -315,7 +309,7 @@ final class EqualObjectGraphs {
                             // As long as people bother to reasonably name their symbols,
                             // this will work. If there's clashes in symbol names (e.g.
                             // lots of unnamed symbols) it can lead to false inequalities.
-                            return getSymbolName((Symbol) a).compareTo(getSymbolName((Symbol) b));
+                            return ((Symbol) a).getName().compareTo(((Symbol) b).getName());
                         } else if (b instanceof Integer || b instanceof String) {
                             return 1; // symbols after ints and strings
                         }
@@ -326,21 +320,12 @@ final class EqualObjectGraphs {
         return ids;
     }
 
-    private static String getSymbolName(final Symbol s) {
-        if (s instanceof SymbolKey) {
-            return ((SymbolKey) s).getName();
-        } else if (s instanceof NativeSymbol) {
-            return ((NativeSymbol) s).getKey().getName();
-        } else {
-            // We can only handle native Rhino Symbol types
-            throw new ClassCastException();
-        }
-    }
-
     private static Object[] getIds(final Scriptable s) {
         if (s instanceof ScriptableObject) {
             // Grabs symbols too
-            return ((ScriptableObject) s).getIds(true, true);
+            try (var map = ((ScriptableObject) s).startCompoundOp(false)) {
+                return ((ScriptableObject) s).getIds(map, true, true);
+            }
         } else if (s instanceof DebuggableObject) {
             return ((DebuggableObject) s).getAllIds();
         } else {

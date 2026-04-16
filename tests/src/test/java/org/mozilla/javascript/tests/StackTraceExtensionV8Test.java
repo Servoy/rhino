@@ -12,6 +12,7 @@ import org.mozilla.javascript.ContextFactory;
 import org.mozilla.javascript.RhinoException;
 import org.mozilla.javascript.Scriptable;
 import org.mozilla.javascript.StackStyle;
+import org.mozilla.javascript.testutils.Utils;
 import org.mozilla.javascript.tools.shell.Global;
 
 public class StackTraceExtensionV8Test {
@@ -25,23 +26,13 @@ public class StackTraceExtensionV8Test {
         RhinoException.setStackStyle(StackStyle.RHINO);
     }
 
-    private void testTraces(int opt) {
+    private void testTraces(boolean interpretedMode) {
         final ContextFactory factory =
-                new ContextFactory() {
-                    @Override
-                    protected boolean hasFeature(Context cx, int featureIndex) {
-                        switch (featureIndex) {
-                            case Context.FEATURE_LOCATION_INFORMATION_IN_ERROR:
-                                return true;
-                            default:
-                                return super.hasFeature(cx, featureIndex);
-                        }
-                    }
-                };
+                Utils.contextFactoryWithFeatures(Context.FEATURE_LOCATION_INFORMATION_IN_ERROR);
 
         try (Context cx = factory.enterContext()) {
             cx.setLanguageVersion(Context.VERSION_1_8);
-            cx.setOptimizationLevel(opt);
+            cx.setInterpretedMode(interpretedMode);
             cx.setGeneratingDebug(true);
 
             Global global = new Global(cx);
@@ -56,17 +47,12 @@ public class StackTraceExtensionV8Test {
     }
 
     @Test
-    public void stackTrace0() {
-        testTraces(0);
+    public void stackTraceInterpreted() {
+        testTraces(true);
     }
 
     @Test
-    public void stackTrace9() {
-        testTraces(9);
-    }
-
-    @Test
-    public void stackTraceInt() {
-        testTraces(-1);
+    public void stackTraceCompiled() {
+        testTraces(false);
     }
 }

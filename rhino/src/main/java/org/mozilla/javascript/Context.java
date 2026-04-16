@@ -19,7 +19,6 @@ import java.io.Writer;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.util.ArrayDeque;
-import java.util.Deque;
 import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -34,6 +33,8 @@ import org.mozilla.javascript.ast.AstRoot;
 import org.mozilla.javascript.ast.ScriptNode;
 import org.mozilla.javascript.debug.DebuggableScript;
 import org.mozilla.javascript.debug.Debugger;
+import org.mozilla.javascript.lc.type.TypeInfo;
+import org.mozilla.javascript.lc.type.TypeInfoFactory;
 import org.mozilla.javascript.xml.XMLLib;
 
 /**
@@ -136,38 +137,38 @@ public class Context implements Closeable {
     public static final int VERSION_ECMASCRIPT = 250;
 
     /**
-     * Controls behaviour of <code>Date.prototype.getYear()</code>. If <code>
-     * hasFeature(FEATURE_NON_ECMA_GET_YEAR)</code> returns true, Date.prototype.getYear subtructs
-     * 1900 only if 1900 &lt;= date &lt; 2000. The default behavior of {@link #hasFeature(int)} is
-     * always to subtract 1900 as required by ECMAScript B.2.4.
+     * Controls behaviour of {@code Date.prototype.getYear()}. If {@code
+     * hasFeature(FEATURE_NON_ECMA_GET_YEAR)} returns true, Date.prototype.getYear subtructs 1900
+     * only if 1900 &lt;= date &lt; 2000. The default behavior of {@link #hasFeature(int)} is always
+     * to subtract 1900 as required by ECMAScript B.2.4.
      */
     public static final int FEATURE_NON_ECMA_GET_YEAR = 1;
 
     /**
-     * Control if member expression as function name extension is available. If <code>
-     * hasFeature(FEATURE_MEMBER_EXPR_AS_FUNCTION_NAME)</code> returns true, allow <code>
-     * function memberExpression(args) { body }</code> to be syntax sugar for <code>
-     * memberExpression = function(args) { body }</code>, when memberExpression is not a simple
-     * identifier. See ECMAScript-262, section 11.2 for definition of memberExpression. By default
-     * {@link #hasFeature(int)} returns false.
+     * Control if member expression as function name extension is available. If {@code
+     * hasFeature(FEATURE_MEMBER_EXPR_AS_FUNCTION_NAME)} returns true, allow {@code function
+     * memberExpression(args) { body }} to be syntax sugar for {@code memberExpression =
+     * function(args) { body }}, when memberExpression is not a simple identifier. See
+     * ECMAScript-262, section 11.2 for definition of memberExpression. By default {@link
+     * #hasFeature(int)} returns false.
      */
     public static final int FEATURE_MEMBER_EXPR_AS_FUNCTION_NAME = 2;
 
     /**
-     * Control if reserved keywords are treated as identifiers. If <code>
-     * hasFeature(RESERVED_KEYWORD_AS_IDENTIFIER)</code> returns true, treat future reserved keyword
-     * (see Ecma-262, section 7.5.3) as ordinary identifiers but warn about this usage.
+     * Control if reserved keywords are treated as identifiers. If {@code
+     * hasFeature(RESERVED_KEYWORD_AS_IDENTIFIER)} returns true, treat future reserved keyword (see
+     * Ecma-262, section 7.5.3) as ordinary identifiers but warn about this usage.
      *
      * <p>By default {@link #hasFeature(int)} returns false.
      */
     public static final int FEATURE_RESERVED_KEYWORD_AS_IDENTIFIER = 3;
 
     /**
-     * Control if <code>toString()</code> should returns the same result as <code>toSource()</code>
-     * when applied to objects and arrays. If <code>hasFeature(FEATURE_TO_STRING_AS_SOURCE)</code>
-     * returns true, calling <code>toString()</code> on JS objects gives the same result as calling
-     * <code>toSource()</code>. That is it returns JS source with code to create an object with all
-     * enumerable fields of the original object instead of printing <code>[object <i>result of
+     * Control if {@code toString()} should returns the same result as {@code toSource()} when
+     * applied to objects and arrays. If {@code hasFeature(FEATURE_TO_STRING_AS_SOURCE)} returns
+     * true, calling {@code toString()} on JS objects gives the same result as calling {@code
+     * toSource()}. That is it returns JS source with code to create an object with all enumerable
+     * fields of the original object instead of printing <code>[object <i>result of
      * {@link Scriptable#getClassName()}</i>]</code>.
      *
      * <p>By default {@link #hasFeature(int)} returns true only if the current JS version is set to
@@ -176,16 +177,15 @@ public class Context implements Closeable {
     public static final int FEATURE_TO_STRING_AS_SOURCE = 4;
 
     /**
-     * Control if properties <code>__proto__</code> and <code>__parent__</code> are treated
-     * specially. If <code>hasFeature(FEATURE_PARENT_PROTO_PROPERTIES)</code> returns true, treat
-     * <code>__parent__</code> and <code>__proto__</code> as special properties.
+     * Control if properties {@code __proto__} and {@code __parent__} are treated specially. If
+     * {@code hasFeature(FEATURE_PARENT_PROTO_PROPERTIES)} returns true, treat {@code __parent__}
+     * and {@code __proto__} as special properties.
      *
      * <p>The properties allow to query and set scope and prototype chains for the objects. The
      * special meaning of the properties is available only when they are used as the right hand side
-     * of the dot operator. For example, while <code>x.__proto__ = y</code> changes the prototype
-     * chain of the object <code>x</code> to point to <code>y</code>, <code>x["__proto__"] = y
-     * </code> simply assigns a new value to the property <code>__proto__</code> in <code>x</code>
-     * even when the feature is on.
+     * of the dot operator. For example, while {@code x.__proto__ = y} changes the prototype chain
+     * of the object {@code x} to point to {@code y}, {@code x["__proto__"] = y } simply assigns a
+     * new value to the property {@code __proto__} in {@code x} even when the feature is on.
      *
      * <p>By default {@link #hasFeature(int)} returns true.
      */
@@ -330,7 +330,7 @@ public class Context implements Closeable {
 
     /**
      * If set, then all integer numbers will be returned without decimal place. For instance assume
-     * there is a function like this: <code>function foo() {return 5;}</code> 5 will be returned if
+     * there is a function like this: {@code function foo() {return 5;}} 5 will be returned if
      * feature is set, 5.0 otherwise.
      */
     public static final int FEATURE_INTEGER_WITHOUT_DECIMAL_PLACE = 18;
@@ -364,7 +364,7 @@ public class Context implements Closeable {
      *
      * <p>WARNING: This feature is similar to the one in Nashorn, but incomplete.
      *
-     * <p>1. A entry has priority over method.
+     * <p>1. An entry has priority over method.
      *
      * <p>map.put("put", "abc"); map.put; // abc map.put("put", "efg"); // ERROR
      *
@@ -377,8 +377,8 @@ public class Context implements Closeable {
     public static final int FEATURE_ENABLE_JAVA_MAP_ACCESS = 21;
 
     /**
-     * Internationalization API implementation (see https://tc39.github.io/ecma402) can be activated
-     * using this feature.
+     * Internationalization API implementation (see <a
+     * href="https://tc39.github.io/ecma402">ECMA-402</a>) can be activated using this feature.
      *
      * @since 1.7 Release 15
      */
@@ -404,6 +404,15 @@ public class Context implements Closeable {
      * @deprecated As of 1.8.1, use {@link ScriptRuntime#emptyArgs} instead.
      */
     @Deprecated public static final Object[] emptyArgs = ScriptRuntime.emptyArgs;
+
+    /**
+     * Stores the current context per thread.
+     *
+     * <p>Note: former methods (VMBridge) have used an Object[] for performance reasons. This seems
+     * to be outdated. ThreadLocal.get/set gives better performance. (But do not use
+     * ThreadLocal.remove.) See ContextThreadLocalBenchmark
+     */
+    private static final ThreadLocal<Context> currentContext = new ThreadLocal<>();
 
     /**
      * Creates a new Context. The context will be associated with the {@link
@@ -454,16 +463,13 @@ public class Context implements Closeable {
      * <p>The current Context is per-thread; this method looks up the Context associated with the
      * current thread.
      *
-     * <p>
-     *
      * @return the Context associated with the current thread, or null if no context is associated
      *     with the current thread.
      * @see ContextFactory#enterContext()
      * @see ContextFactory#call(ContextAction)
      */
     public static Context getCurrentContext() {
-        Object helper = VMBridge.instance.getThreadContextHelper();
-        return VMBridge.instance.getContext(helper);
+        return currentContext.get();
     }
 
     /**
@@ -481,9 +487,9 @@ public class Context implements Closeable {
     /**
      * Get a Context associated with the current thread, using the given Context if need be.
      *
-     * <p>The same as <code>enter()</code> except that <code>cx</code> is associated with the
-     * current thread and returned if the current thread has no associated context and <code>cx
-     * </code> is not associated with any other thread.
+     * <p>The same as {@code enter()} except that {@code cx} is associated with the current thread
+     * and returned if the current thread has no associated context and {@code cx } is not
+     * associated with any other thread.
      *
      * @param cx a Context to associate with the thread if possible
      * @return a Context associated with the current thread
@@ -498,8 +504,7 @@ public class Context implements Closeable {
     }
 
     static final Context enter(Context cx, ContextFactory factory) {
-        Object helper = VMBridge.instance.getThreadContextHelper();
-        Context old = VMBridge.instance.getContext(helper);
+        Context old = currentContext.get();
         if (old != null) {
             cx = old;
         } else {
@@ -519,7 +524,7 @@ public class Context implements Closeable {
                             "can not use Context instance already associated with some thread");
                 }
             }
-            VMBridge.instance.setContext(helper, cx);
+            currentContext.set(cx);
         }
         ++cx.enterCount;
         return cx;
@@ -528,7 +533,7 @@ public class Context implements Closeable {
     /**
      * Exit a block of code requiring a Context.
      *
-     * <p>Calling <code>exit()</code> will remove the association between the current thread and a
+     * <p>Calling {@code exit()} will remove the association between the current thread and a
      * Context if the prior call to {@link ContextFactory#enterContext()} on this thread newly
      * associated a Context with this thread. Once the current thread no longer has an associated
      * Context, it cannot be used to execute JavaScript until it is again associated with a Context.
@@ -536,15 +541,13 @@ public class Context implements Closeable {
      * @see ContextFactory#enterContext()
      */
     public static void exit() {
-        Object helper = VMBridge.instance.getThreadContextHelper();
-        Context cx = VMBridge.instance.getContext(helper);
+        Context cx = currentContext.get();
         if (cx == null) {
             throw new IllegalStateException("Calling Context.exit without previous Context.enter");
         }
         if (cx.enterCount < 1) Kit.codeBug();
         if (--cx.enterCount == 0) {
-            VMBridge.instance.setContext(helper, null);
-            cx.factory.onContextReleased(cx);
+            releaseContext(cx);
         }
     }
 
@@ -552,17 +555,24 @@ public class Context implements Closeable {
     public void close() {
         if (enterCount < 1) Kit.codeBug();
         if (--enterCount == 0) {
-            Object helper = VMBridge.instance.getThreadContextHelper();
-            VMBridge.instance.setContext(helper, null);
-            factory.onContextReleased(this);
+            assert (currentContext.get() == this)
+                    : "currentContext: " + currentContext.get() + ", this: " + this;
+            releaseContext(this);
         }
+    }
+
+    private static void releaseContext(Context cx) {
+        // do not use contextLocal.remove() here, as this might be much slower, when the same thread
+        // creates a new context. See ContextThreadLocalBenchmark.
+        currentContext.set(null);
+        cx.factory.onContextReleased(cx);
     }
 
     /**
      * Call {@link ContextAction#run(Context cx)} using the Context instance associated with the
-     * current thread. If no Context is associated with the thread, then <code>
-     * ContextFactory.getGlobal().makeContext()</code> will be called to construct new Context
-     * instance. The instance will be temporary associated with the thread during call to {@link
+     * current thread. If no Context is associated with the thread, then {@code
+     * ContextFactory.getGlobal().makeContext()} will be called to construct new Context instance.
+     * The instance will be temporary associated with the thread during call to {@link
      * ContextAction#run(Context)}.
      *
      * @deprecated use {@link ContextFactory#call(ContextAction)} instead as this method relies on
@@ -581,9 +591,8 @@ public class Context implements Closeable {
      * Context instance. The instance will be temporary associated with the thread during call to
      * {@link ContextAction#run(Context)}.
      *
-     * <p>It is allowed but not advisable to use null for <code>factory</code> argument in which
-     * case the global static singleton ContextFactory instance will be used to create new context
-     * instances.
+     * <p>It is allowed but not advisable to use null for {@code factory} argument in which case the
+     * global static singleton ContextFactory instance will be used to create new context instances.
      *
      * @see ContextFactory#call(ContextAction)
      */
@@ -661,8 +670,8 @@ public class Context implements Closeable {
      * Seal this Context object so any attempt to modify any of its properties including calling
      * {@link #enter()} and {@link #exit()} methods will throw an exception.
      *
-     * <p>If <code>sealKey</code> is not null, calling {@link #unseal(Object sealKey)} with the same
-     * key unseals the object. If <code>sealKey</code> is null, unsealing is no longer possible.
+     * <p>If {@code sealKey} is not null, calling {@link #unseal(Object sealKey)} with the same key
+     * unseals the object. If {@code sealKey} is null, unsealing is no longer possible.
      *
      * @see #isSealed()
      * @see #unseal(Object)
@@ -674,9 +683,9 @@ public class Context implements Closeable {
     }
 
     /**
-     * Unseal previously sealed Context object. The <code>sealKey</code> argument should not be null
-     * and should match <code>sealKey</code> supplied with the last call to {@link #seal(Object)} or
-     * an exception will be thrown.
+     * Unseal previously sealed Context object. The {@code sealKey} argument should not be null and
+     * should match {@code sealKey} supplied with the last call to {@link #seal(Object)} or an
+     * exception will be thrown.
      *
      * @see #isSealed()
      * @see #seal(Object sealKey)
@@ -772,7 +781,7 @@ public class Context implements Closeable {
      * <p>The implementation version is of the form
      *
      * <pre>
-     *    "<i>name langVer</i> <code>release</code> <i>relNum date</i>"
+     *    "<i>name langVer</i> {@code release} <i>relNum date</i>"
      * </pre>
      *
      * where <i>name</i> is the name of the product, <i>langVer</i> is the language version,
@@ -1250,7 +1259,7 @@ public class Context implements Closeable {
             Scriptable scope, String source, String sourceName, int lineno, Object securityDomain) {
         Script script = compileString(source, sourceName, lineno, securityDomain);
         if (script != null) {
-            return script.exec(this, scope);
+            return script.exec(this, scope, scope);
         }
         return null;
     }
@@ -1275,7 +1284,7 @@ public class Context implements Closeable {
             throws IOException {
         Script script = compileReader(in, sourceName, lineno, securityDomain);
         if (script != null) {
-            return script.exec(this, scope);
+            return script.exec(this, scope, scope);
         }
         return null;
     }
@@ -1294,15 +1303,26 @@ public class Context implements Closeable {
      */
     public Object executeScriptWithContinuations(Script script, Scriptable scope)
             throws ContinuationPending {
-        if (!(script instanceof InterpretedFunction)
-                || !((InterpretedFunction) script).isScript()) {
+        if (!(script instanceof JSScript)
+                || !(((JSScript) script).getCode() instanceof InterpreterData)) {
             // Can only be applied to scripts
             throw new IllegalArgumentException(
                     "Script argument was not"
                             + " a script or was not created by interpreted mode ");
         }
-        return callFunctionWithContinuations(
-                (InterpretedFunction) script, scope, ScriptRuntime.emptyArgs);
+        return callFunctionWithContinuations((JSScript) script, scope);
+    }
+
+    public Object executeScriptWithContinuations(Callable callable, Scriptable scope)
+            throws ContinuationPending {
+        if (!(callable instanceof JSFunction)
+                || !(((JSFunction) callable).getCode() instanceof InterpreterData)) {
+            // Can only be applied to scripts
+            throw new IllegalArgumentException(
+                    "Script argument was not"
+                            + " a script or was not created by interpreted mode ");
+        }
+        return callFunctionWithContinuations((JSFunction) callable, scope, ScriptRuntime.emptyArgs);
     }
 
     /**
@@ -1310,17 +1330,17 @@ public class Context implements Closeable {
      * to catch a ContinuationPending exception and resume execution by calling {@link
      * #resumeContinuation(Object, Scriptable, Object)}.
      *
-     * @param function The function to call. The function must have been compiled with interpreted
-     *     mode (optimization level -1)
+     * @param script The script to call. The script must have been compiled with interpreted mode
+     *     (optimization level -1)
      * @param scope The scope to execute the script against
-     * @param args The arguments for the function
      * @throws ContinuationPending if the script calls a function that results in a call to {@link
      *     #captureContinuation()}
      * @since 1.7 Release 2
      */
-    public Object callFunctionWithContinuations(Callable function, Scriptable scope, Object[] args)
+    public Object callFunctionWithContinuations(Script script, Scriptable scope)
             throws ContinuationPending {
-        if (!(function instanceof InterpretedFunction)) {
+        if (!(script instanceof JSScript)
+                || !(script.getDescriptor().getCode() instanceof InterpreterData)) {
             // Can only be applied to scripts
             throw new IllegalArgumentException(
                     "Function argument was not" + " created by interpreted mode ");
@@ -1333,7 +1353,28 @@ public class Context implements Closeable {
         // Annotate so we can check later to ensure no java code in
         // intervening frames
         isContinuationsTopCall = true;
-        return ScriptRuntime.doTopCall(function, this, scope, scope, args, isTopLevelStrict);
+        return ScriptRuntime.doTopCall(script, this, scope, scope, isTopLevelStrict);
+    }
+
+    public Object callFunctionWithContinuations(Callable callable, Scriptable scope, Object[] args)
+            throws ContinuationPending {
+        if (!(callable instanceof JSFunction)
+                || !(((JSFunction) callable).getDescriptor().getCode()
+                        instanceof InterpreterData)) {
+            // Can only be applied to scripts
+            throw new IllegalArgumentException(
+                    "Function argument was not" + " created by interpreted mode ");
+        }
+        if (ScriptRuntime.hasTopCall(this)) {
+            throw new IllegalStateException(
+                    "Cannot have any pending top "
+                            + "calls when executing a script with continuations");
+        }
+        // Annotate so we can check later to ensure no java code in
+        // intervening frames
+        isContinuationsTopCall = true;
+        return ScriptRuntime.doTopCall(
+                (JSFunction) callable, this, scope, scope, args, isTopLevelStrict);
     }
 
     /**
@@ -1557,8 +1598,7 @@ public class Context implements Closeable {
      * @return a string representing the script source
      */
     public final String decompileScript(Script script, int indent) {
-        NativeFunction scriptImpl = (NativeFunction) script;
-        return scriptImpl.decompile(indent, EnumSet.noneOf(DecompilerFlag.class));
+        return ((JSScript) script).getDescriptor().getRawSource();
     }
 
     /**
@@ -1617,7 +1657,7 @@ public class Context implements Closeable {
     /**
      * Create a new JavaScript object by executing the named constructor.
      *
-     * <p>The call <code>newObject(scope, "Foo")</code> is equivalent to evaluating "new Foo()".
+     * <p>The call {@code newObject(scope, "Foo")} is equivalent to evaluating "new Foo()".
      *
      * @param scope the scope to search for the constructor and to evaluate against
      * @param constructorName the name of the constructor to call
@@ -1630,8 +1670,8 @@ public class Context implements Closeable {
     /**
      * Creates a new JavaScript object by executing the named constructor.
      *
-     * <p>Searches <code>scope</code> for the named constructor, calls it with the given arguments,
-     * and returns the result.
+     * <p>Searches {@code scope} for the named constructor, calls it with the given arguments, and
+     * returns the result.
      *
      * <p>The code
      *
@@ -1640,7 +1680,7 @@ public class Context implements Closeable {
      * newObject(scope, "Foo", args)</pre>
      *
      * is equivalent to evaluating "new Foo('a', 'b')", assuming that the Foo constructor has been
-     * defined in <code>scope</code>.
+     * defined in {@code scope}.
      *
      * @param scope The scope to search for the constructor and to evaluate against
      * @param constructorName the name of the constructor to call
@@ -1653,8 +1693,6 @@ public class Context implements Closeable {
 
     /**
      * Create an array with a specified initial length.
-     *
-     * <p>
      *
      * @param scope the scope to create the object in
      * @param length the initial length (JavaScript arrays may have additional properties added
@@ -1732,8 +1770,6 @@ public class Context implements Closeable {
      *
      * <p>See ECMA 9.8.
      *
-     * <p>
-     *
      * @param value a JavaScript value
      * @return the corresponding String value converted using the ECMA rules
      */
@@ -1777,8 +1813,8 @@ public class Context implements Closeable {
      * function and object.
      *
      * <p>Note that for Number instances during any arithmetic operation in JavaScript the engine
-     * will always use the result of <code>Number.doubleValue()</code> resulting in a precision loss
-     * if the number can not fit into double.
+     * will always use the result of {@code Number.doubleValue()} resulting in a precision loss if
+     * the number can not fit into double.
      *
      * <p>If value is an instance of Character, it will be converted to string of length 1 and its
      * JavaScript type will be string.
@@ -1807,8 +1843,8 @@ public class Context implements Closeable {
      * function and object.
      *
      * <p>Note that for Number instances during any arithmetic operation in JavaScript the engine
-     * will always use the result of <code>Number.doubleValue()</code> resulting in a precision loss
-     * if the number can not fit into double.
+     * will always use the result of {@code Number.doubleValue()} resulting in a precision loss if
+     * the number can not fit into double.
      *
      * <p>If value is an instance of Character, it will be converted to string of length 1 and its
      * JavaScript type will be string.
@@ -1837,7 +1873,7 @@ public class Context implements Closeable {
             if (cx == null) {
                 cx = Context.getContext();
             }
-            return cx.getWrapFactory().wrap(cx, scope, value, null);
+            return cx.getWrapFactory().wrap(cx, scope, value, TypeInfo.NONE);
         }
     }
 
@@ -1852,6 +1888,10 @@ public class Context implements Closeable {
      * @throws EvaluatorException if the conversion cannot be performed
      */
     public static Object jsToJava(Object value, Class<?> desiredType) throws EvaluatorException {
+        return jsToJava(value, TypeInfoFactory.GLOBAL.create(desiredType));
+    }
+
+    public static Object jsToJava(Object value, TypeInfo desiredType) throws EvaluatorException {
         return NativeJavaObject.coerceTypeImpl(desiredType, value);
     }
 
@@ -2102,8 +2142,7 @@ public class Context implements Closeable {
      * Set the security controller for this context.
      *
      * <p>SecurityController may only be set if it is currently null and {@link
-     * SecurityController#hasGlobal()} is <code>false</code>. Otherwise a SecurityException is
-     * thrown.
+     * SecurityController#hasGlobal()} is {@code false}. Otherwise a SecurityException is thrown.
      *
      * @param controller a SecurityController object
      * @throws SecurityException if there is already a SecurityController object for this Context or
@@ -2191,8 +2230,6 @@ public class Context implements Closeable {
 
     /**
      * Put a value that can later be retrieved using a given key.
-     *
-     * <p>
      *
      * @param key the key used to index the value
      * @param value the value to save
@@ -2285,9 +2322,9 @@ public class Context implements Closeable {
      * Return DebuggableScript instance if any associated with the script. If callable supports
      * DebuggableScript implementation, the method returns it. Otherwise null is returned.
      */
-    public static DebuggableScript getDebuggableView(Script script) {
-        if (script instanceof NativeFunction) {
-            return ((NativeFunction) script).getDebuggableView();
+    public static DebuggableScript getDebuggableView(ScriptOrFn<?> script) {
+        if (script instanceof JSFunction) {
+            return ((JSFunction) script).getDebuggableView();
         }
         return null;
     }
@@ -2302,7 +2339,7 @@ public class Context implements Closeable {
      * implementation.
      *
      * @param featureIndex feature index to check
-     * @return true if the <code>featureIndex</code> feature is turned on
+     * @return true if the {@code featureIndex} feature is turned on
      * @see #FEATURE_NON_ECMA_GET_YEAR
      * @see #FEATURE_MEMBER_EXPR_AS_FUNCTION_NAME
      * @see #FEATURE_RESERVED_KEYWORD_AS_IDENTIFIER
@@ -2323,17 +2360,17 @@ public class Context implements Closeable {
     }
 
     /**
-     * Returns an object which specifies an E4X implementation to use within this <code>Context
-     * </code>. Note that the XMLLib.Factory interface should be considered experimental.
+     * Returns an object which specifies an E4X implementation to use within this {@code Context }.
+     * Note that the XMLLib.Factory interface should be considered experimental.
      *
-     * <p>The default implementation uses the implementation provided by this <code>Context</code>'s
+     * <p>The default implementation uses the implementation provided by this {@code Context}'s
      * {@link ContextFactory}.
      *
      * <p>This is no longer used in E4X -- an implementation is only provided for backward
      * compatibility.
      *
-     * @return An XMLLib.Factory. Should not return <code>null</code> if {@link #FEATURE_E4X} is
-     *     enabled. See {@link #hasFeature}.
+     * @return An XMLLib.Factory. Should not return {@code null} if {@link #FEATURE_E4X} is enabled.
+     *     See {@link #hasFeature}.
      */
     @Deprecated
     public XMLLib.Factory getE4xImplementationFactory() {
@@ -2344,25 +2381,25 @@ public class Context implements Closeable {
     }
 
     /**
-     * Get threshold of executed instructions counter that triggers call to <code>
-     * observeInstructionCount()</code>. When the threshold is zero, instruction counting is
-     * disabled, otherwise each time the run-time executes at least the threshold value of script
-     * instructions, <code>observeInstructionCount()</code> will be called.
+     * Get threshold of executed instructions counter that triggers call to {@code
+     * observeInstructionCount()}. When the threshold is zero, instruction counting is disabled,
+     * otherwise each time the run-time executes at least the threshold value of script
+     * instructions, {@code observeInstructionCount()} will be called.
      */
     public final int getInstructionObserverThreshold() {
         return instructionThreshold;
     }
 
     /**
-     * Set threshold of executed instructions counter that triggers call to <code>
-     * observeInstructionCount()</code>. When the threshold is zero, instruction counting is
-     * disabled, otherwise each time the run-time executes at least the threshold value of script
-     * instructions, <code>observeInstructionCount()</code> will be called.<br>
+     * Set threshold of executed instructions counter that triggers call to {@code
+     * observeInstructionCount()}. When the threshold is zero, instruction counting is disabled,
+     * otherwise each time the run-time executes at least the threshold value of script
+     * instructions, {@code observeInstructionCount()} will be called.<br>
      * Note that the meaning of "instruction" is not guaranteed to be consistent between compiled
      * and interpretive modes: executing a given script or function in the different modes will
      * result in different instruction counts against the threshold. {@link
-     * #setGenerateObserverCount} is called with true if <code>threshold</code> is greater than
-     * zero, false otherwise.
+     * #setGenerateObserverCount} is called with true if {@code threshold} is greater than zero,
+     * false otherwise.
      *
      * @param threshold The instruction threshold
      */
@@ -2395,15 +2432,15 @@ public class Context implements Closeable {
     /**
      * Allow application to monitor counter of executed script instructions in Context subclasses.
      * Run-time calls this when instruction counting is enabled and the counter reaches limit set by
-     * <code>setInstructionObserverThreshold()</code>. The method is useful to observe long running
+     * {@code setInstructionObserverThreshold()}. The method is useful to observe long running
      * scripts and if necessary to terminate them.
      *
      * <p>The default implementation calls {@link ContextFactory#observeInstructionCount(Context cx,
      * int instructionCount)} that allows to customize Context behavior without introducing Context
      * subclasses.
      *
-     * @param instructionCount amount of script instruction executed since last call to <code>
-     *     observeInstructionCount</code>
+     * @param instructionCount amount of script instruction executed since last call to {@code
+     *     observeInstructionCount}
      * @throws Error to terminate the script
      * @see #setOptimizationLevel(int)
      */
@@ -2546,6 +2583,7 @@ public class Context implements Closeable {
 
         CompilerEnvirons compilerEnv = new CompilerEnvirons();
         compilerEnv.initFromContext(this);
+        compilerEnv.setSecurityDomain(securityDomain);
         if (compilationErrorReporter == null) {
             compilationErrorReporter = compilerEnv.getErrorReporter();
         }
@@ -2589,8 +2627,8 @@ public class Context implements Closeable {
 
         if (debugger != null) {
             if (sourceString == null) Kit.codeBug();
-            if (bytecode instanceof DebuggableScript) {
-                DebuggableScript dscript = (DebuggableScript) bytecode;
+            DebuggableScript dscript = compiler.getDebuggableScript(bytecode);
+            if (dscript != null) {
                 notifyDebugger_r(this, dscript, sourceString);
             } else {
                 throw new RuntimeException("NOT SUPPORTED");
@@ -2617,9 +2655,6 @@ public class Context implements Closeable {
         Parser p = new Parser(compilerEnv, compilationErrorReporter);
         if (returnFunction) {
             p.calledByCompileFunction = true;
-        }
-        if (isStrictMode()) {
-            p.setDefaultUseStrictDirective(true);
         }
 
         AstRoot ast = p.parse(sourceString, sourceName, lineno);
@@ -2655,7 +2690,9 @@ public class Context implements Closeable {
     }
 
     private static Class<?> codegenClass =
-            Kit.classOrNull("org.mozilla.javascript.optimizer.Codegen");
+            ScriptRuntime.androidApi > 0
+                    ? null
+                    : Kit.classOrNull("org.mozilla.javascript.optimizer.Codegen");
     private static Class<?> interpreterClass =
             Kit.classOrNull("org.mozilla.javascript.Interpreter");
 
@@ -2743,7 +2780,7 @@ public class Context implements Closeable {
      * objects.
      *
      * @param name the name of the object to test
-     * @return true if an function activation object is needed.
+     * @return true if a function activation object is needed.
      */
     public final boolean isActivationNeeded(String name) {
         return activationNames != null && activationNames.contains(name);
@@ -2827,12 +2864,9 @@ public class Context implements Closeable {
     /** This is the list of names of objects forcing the creation of function activation records. */
     Set<String> activationNames;
 
-    // For the interpreter to store the last frame for error reports etc.
+    // For the interpreter to store the last frame for error reports
+    // etc. Previous frames can all be derived from this.
     Object lastInterpreterFrame;
-
-    // For the interpreter to store information about previous invocations
-    // interpreter invocations
-    Deque<Object> previousInterpreterInvocations;
 
     // For instruction counting (interpreter only)
     int instructionCount;

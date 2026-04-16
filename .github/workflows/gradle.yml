@@ -5,60 +5,88 @@ on:
     branches: [ master ]
   pull_request:
     branches: [ master ]
+  workflow_dispatch:  
 
 permissions: read-all
 
 jobs:
-  build:
+  test:
     runs-on: ubuntu-latest
     strategy:
-      # Some tests require more CPU, and all can use multiple CPUs
-      max-parallel: 1
-    name: Rhino Tests
+      fail-fast: false
+      matrix:
+        include:
+          - java-version: "11"
+            name: "Java 11"
+            multithread: false
+          - java-version: "17"
+            name: "Java 17"
+            multithread: false
+          - java-version: "21"
+            name: "Java 21"
+            multithread: false
+          - java-version: "21"
+            name: "Java 21 Multithreaded"
+            multithread: true
+    name: ${{ matrix.name }}
     steps:
     - name: Check out Rhino
-      uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      uses: actions/checkout@ff7abcd0c3c05ccf6adc123a8cd1fd4fb30fb493 # v4.2.2
     - name: Check out test262
       # We don't actually want all the history for this part
       run: git submodule update --init --single-branch
     - name: Set up Java
-      uses: actions/setup-java@3a4f6e1af504cf6a31855fa899c6aa5355ba6c12 # v4.7.0
-      # By putting JVMs in reverse order, the last one is the one that
-      # will go in the path.
+      uses: actions/setup-java@f2beeb24e141e01a676f977032f5a29d81c9e27e # v5.1.0
+      with:
+        java-version: |
+          ${{ matrix.java-version }}
+          21
+        distribution: 'adopt'
+    - name: Build and test ${{ matrix.name }}
+      env:
+        RHINO_TEST_JAVA_VERSION: ${{ matrix.java-version }}
+      run: >-
+        ./gradlew check ${{ matrix.multithread && '-Drhino.useThreadSafeObjectsByDefault=true' || '' }}
+    - name: Upload results ${{ matrix.name }}
+      uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+      if: ${{ always() }}
+      with:
+        name: reports-java-${{ matrix.java-version }}-${{ matrix.multithread }}
+        path: '*/build/reports'
+
+  test262:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Check out Rhino
+      uses: actions/checkout@ff7abcd0c3c05ccf6adc123a8cd1fd4fb30fb493 # v4.2.2
+    - name: Check out test262
+      run: git submodule update --init --single-branch
+    - name: Set up Java
+      uses: actions/setup-java@f2beeb24e141e01a676f977032f5a29d81c9e27e # v5.1.0
       with:
         java-version: |
           11
-          17
           21
         distribution: 'adopt'
-    - name: Build and test Java 21
-      run: >-
-        ./gradlew check
-    - name: Upload results Java 21
-      uses: actions/upload-artifact@65c4c4a1ddee5b72f698fdd19549f0f0fb45cf08 # v4.6.0
-      if: ${{ always() }}
-      with:
-        name: reports-java-21
-        path: '*/build/reports'
-    - name: Build and test Java 17
-      env:
-        RHINO_TEST_JAVA_VERSION: "17"
-      run: >-
-        ./gradlew check
-    - name: Upload results Java 17
-      uses: actions/upload-artifact@65c4c4a1ddee5b72f698fdd19549f0f0fb45cf08 # v4.6.0
-      if: ${{ always() }}
-      with:
-        name: reports-java-17
-        path: '*/build/reports'
-    - name: Build and test Java 11
+    - name: Check current state of test262.properties
+      id: hashBefore
+      run: echo "hash=${{ hashFiles('./tests/testsrc/test262.properties') }}" >> $GITHUB_OUTPUT
+    - name: Run test262 tests
+      # Currently Java 11 is required to have a reproducible result
       env:
         RHINO_TEST_JAVA_VERSION: "11"
       run: >-
-        ./gradlew check
-    - name: Upload results Java 11
-      uses: actions/upload-artifact@65c4c4a1ddee5b72f698fdd19549f0f0fb45cf08 # v4.6.0
-      if: ${{ always() }}
-      with:
-        name: reports-java-11
-        path: '*/build/reports'
+        ./gradlew :tests:test --tests Test262SuiteTest -DupdateTest262properties
+    - name: Check updated state of test262.properties
+      id: hashAfter
+      run: echo "hash=${{ hashFiles('./tests/testsrc/test262.properties') }}" >> $GITHUB_OUTPUT
+    - name: Compare test262 results
+      run: |
+        if [ "${{ steps.hashBefore.outputs.hash }}" != "${{ steps.hashAfter.outputs.hash }}" ]; then
+          echo "The test262.properties file was not updated properly."
+          echo "Please follow the instructions in tests/README.md to update it."
+          git --no-pager diff ./tests/testsrc/test262.properties
+          exit 1
+        else
+          echo "The test262.properties file is up to date."
+        fi

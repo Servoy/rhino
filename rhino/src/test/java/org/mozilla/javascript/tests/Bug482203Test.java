@@ -24,7 +24,7 @@ public class Bug482203Test {
                     new InputStreamReader(Bug482203Test.class.getResourceAsStream("Bug482203.js"));
             Script script = cx.compileReader(in, "", 1, null);
             Scriptable scope = cx.initStandardObjects();
-            script.exec(cx, scope);
+            script.exec(cx, scope, scope);
             int counter = 0;
             for (; ; ) {
                 Object cont = ScriptableObject.getProperty(scope, "c");
@@ -34,7 +34,7 @@ public class Bug482203Test {
                 counter++;
                 ((Callable) cont).call(cx, scope, scope, new Object[] {null});
             }
-            assertEquals(counter, 5);
+            assertEquals(5, counter);
             assertEquals(Double.valueOf(3), ScriptableObject.getProperty(scope, "result"));
         }
     }
@@ -57,7 +57,7 @@ public class Bug482203Test {
                 counter++;
                 cx.resumeContinuation(cont, scope, null);
             }
-            assertEquals(counter, 5);
+            assertEquals(5, counter);
             assertEquals(Double.valueOf(3), ScriptableObject.getProperty(scope, "result"));
         }
     }

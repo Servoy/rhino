@@ -22,8 +22,7 @@ public class RegExpImpl implements RegExpProxy {
     @Override
     public void register(ScriptableObject scope, boolean sealed) {
         NativeRegExpStringIterator.init(scope, sealed);
-        new LazilyLoadedCtor(
-                scope, "RegExp", "org.mozilla.javascript.regexp.NativeRegExp", sealed, true);
+        new LazilyLoadedCtor(scope, "RegExp", sealed, true, NativeRegExp::init);
     }
 
     @Override
@@ -89,8 +88,7 @@ public class RegExpImpl implements RegExpProxy {
                         re = createRegExp(cx, scope, args, 2, true);
                         if (RA_REPLACE_ALL == actionType
                                 && (re.getFlags() & NativeRegExp.JSREG_GLOB) == 0) {
-                            throw ScriptRuntime.typeError(
-                                    "replaceAll must be called with a global RegExp");
+                            throw ScriptRuntime.typeErrorById("msg.str.replace.all.no.global.flag");
                         }
                     } else {
                         Object arg0 = args.length < 1 ? Undefined.instance : args[0];
@@ -217,14 +215,13 @@ public class RegExpImpl implements RegExpProxy {
         Object result = null;
         if (data.mode == RA_SEARCH) {
             result = re.executeRegExp(cx, scope, reImpl, str, indexp, NativeRegExp.TEST);
-            if (result != null && result.equals(Boolean.TRUE))
-                result = Integer.valueOf(reImpl.leftContext.length);
+            if (Boolean.TRUE.equals(result)) result = Integer.valueOf(reImpl.leftContext.length);
             else result = Integer.valueOf(-1);
         } else if (data.global) {
             re.lastIndex = ScriptRuntime.zeroObj;
             for (int count = 0; indexp[0] <= str.length(); count++) {
                 result = re.executeRegExp(cx, scope, reImpl, str, indexp, NativeRegExp.TEST);
-                if (result == null || !result.equals(Boolean.TRUE)) break;
+                if (!Boolean.TRUE.equals(result)) break;
                 if (data.mode == RA_MATCH) {
                     match_glob(data, cx, scope, count, reImpl);
                 } else {

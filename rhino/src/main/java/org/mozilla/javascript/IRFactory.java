@@ -9,6 +9,9 @@ package org.mozilla.javascript;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
+import java.util.Queue;
+import org.mozilla.javascript.ast.AbstractObjectProperty;
 import org.mozilla.javascript.ast.ArrayComprehension;
 import org.mozilla.javascript.ast.ArrayComprehensionLoop;
 import org.mozilla.javascript.ast.ArrayLiteral;
@@ -52,6 +55,8 @@ import org.mozilla.javascript.ast.RegExpLiteral;
 import org.mozilla.javascript.ast.ReturnStatement;
 import org.mozilla.javascript.ast.Scope;
 import org.mozilla.javascript.ast.ScriptNode;
+import org.mozilla.javascript.ast.Spread;
+import org.mozilla.javascript.ast.SpreadObjectProperty;
 import org.mozilla.javascript.ast.StringLiteral;
 import org.mozilla.javascript.ast.SwitchCase;
 import org.mozilla.javascript.ast.SwitchStatement;
@@ -94,6 +99,7 @@ public final class IRFactory {
 
     private Parser parser;
     private AstNodePosition astNodePos;
+    private boolean outerScopeIsStrict;
 
     public IRFactory(CompilerEnvirons env, String sourceString) {
         this(env, null, sourceString, env.getErrorReporter());
@@ -190,6 +196,7 @@ public final class IRFactory {
             case Token.FALSE:
             case Token.THIS:
             case Token.NULL:
+            case Token.UNDEFINED:
             case Token.DEBUGGER:
                 return transformLiteral(node);
             case Token.SUPER:
@@ -270,6 +277,9 @@ public final class IRFactory {
                 }
                 if (node instanceof GeneratorMethodDefinition) {
                     return transformGeneratorMethodDefinition((GeneratorMethodDefinition) node);
+                }
+                if (node instanceof Spread) {
+                    return transformSpread((Spread) node);
                 }
                 throw new IllegalArgumentException("Can't transform: " + node);
         }
@@ -426,7 +436,13 @@ public final class IRFactory {
         List<Integer> skipIndexes = null;
         for (int i = 0; i < elems.size(); ++i) {
             AstNode elem = elems.get(i);
-            if (elem.getType() != Token.EMPTY) {
+            if (elem.getType() == Token.DOTDOTDOT) {
+                Spread spread = (Spread) elem;
+                Node transformedSpreadNode = transform(spread);
+                array.addChildToBack(transformedSpreadNode);
+                array.putIntProp(
+                        Node.NUMBER_OF_SPREAD, array.getIntProp(Node.NUMBER_OF_SPREAD, 0) + 1);
+            } else if (elem.getType() != Token.EMPTY) {
                 array.addChildToBack(transform(elem));
             } else {
                 if (skipIndexes == null) {
@@ -446,19 +462,27 @@ public final class IRFactory {
 
     private Node transformAssignment(Assignment node) {
         AstNode right = node.getRight();
-        AstNode left = parser.removeParens(node.getLeft());
+        AstNode originalLeft = node.getLeft();
+        AstNode left = parser.removeParens(originalLeft);
+        boolean shouldTryToInferName =
+                (originalLeft == left); // If we removed parens, we won't try to infer name
         left = transformAssignmentLeft(node, left, right);
 
         Node target = null;
         if (isDestructuring(left)) {
             target = left;
+            shouldTryToInferName = false;
         } else {
             target = transform(left);
         }
 
         astNodePos.push(left);
         try {
-            return createAssignment(node.getType(), target, transform(right));
+            Node transformedRight = transform(right);
+            if (shouldTryToInferName) {
+                inferNameIfMissing(node.getLeft(), transformedRight, null);
+            }
+            return createAssignment(node.getType(), target, transformedRight);
         } finally {
             astNodePos.pop();
         }
@@ -621,6 +645,8 @@ public final class IRFactory {
         Node mexpr = decompileFunctionHeader(fn);
         int index = parser.currentScriptOrFn.addFunction(fn);
 
+        var savedStrict = outerScopeIsStrict;
+        outerScopeIsStrict |= fn.isInStrictMode();
         Parser.PerFunctionVariables savedVars = parser.createPerFunctionVariables(fn);
         try {
             // If we start needing to record much more codegen metadata during
@@ -635,17 +661,18 @@ public final class IRFactory {
             /* Process simple default parameters */
             List<Object> defaultParams = fn.getDefaultParams();
             if (defaultParams != null) {
+                Node paramInitBlock = null;
                 for (int i = defaultParams.size() - 1; i > 0; ) {
                     if (defaultParams.get(i) instanceof AstNode
                             && defaultParams.get(i - 1) instanceof String) {
                         AstNode rhs = (AstNode) defaultParams.get(i);
                         String name = (String) defaultParams.get(i - 1);
-                        body.addChildToFront(
+                        Node paramInit =
                                 createIf(
                                         createBinary(
                                                 Token.SHEQ,
                                                 parser.createName(name),
-                                                parser.createName("undefined")),
+                                                new KeywordLiteral().setType(Token.UNDEFINED)),
                                         new Node(
                                                 Token.EXPR_VOID,
                                                 createAssignment(
@@ -656,9 +683,20 @@ public final class IRFactory {
                                                 body.getColumn()),
                                         null,
                                         body.getLineno(),
-                                        body.getColumn()));
+                                        body.getColumn());
+                        if (fn.isGenerator()) {
+                            if (paramInitBlock == null) {
+                                paramInitBlock = new Node(Token.BLOCK);
+                            }
+                            paramInitBlock.addChildToFront(paramInit);
+                        } else {
+                            body.addChildToFront(paramInit);
+                        }
                     }
                     i -= 2;
+                }
+                if (fn.isGenerator() && paramInitBlock != null) {
+                    fn.setGeneratorParamInitBlock(paramInitBlock);
                 }
             }
 
@@ -696,6 +734,7 @@ public final class IRFactory {
         } finally {
             --parser.nestingOfFunction;
             savedVars.restore();
+            outerScopeIsStrict = savedStrict;
         }
     }
 
@@ -949,7 +988,7 @@ public final class IRFactory {
         // createObjectLiteral rewrites its argument as object
         // creation plus object property entries, so later compiler
         // stages don't need to know about object literals.
-        List<ObjectProperty> elems = node.getElements();
+        List<AbstractObjectProperty> elems = node.getElements();
         Node object = new Node(Token.OBJECTLIT);
         object.setLineColumnNumber(node.getLineno(), node.getColumn());
         Object[] properties;
@@ -958,24 +997,48 @@ public final class IRFactory {
         } else {
             int size = elems.size(), i = 0;
             properties = new Object[size];
-            for (ObjectProperty prop : elems) {
-                Object propKey = Parser.getPropKey(prop.getLeft());
-                if (propKey == null) {
-                    Node theId = transform(prop.getLeft());
-                    properties[i++] = theId;
+            for (AbstractObjectProperty abstractProp : elems) {
+                if (abstractProp instanceof SpreadObjectProperty) {
+                    SpreadObjectProperty spreadObjectProperty = (SpreadObjectProperty) abstractProp;
+                    var transformedSpreadNode = transform(spreadObjectProperty.getSpreadNode());
+                    properties[i++] = transformedSpreadNode;
+                    object.putIntProp(
+                            Node.NUMBER_OF_SPREAD, object.getIntProp(Node.NUMBER_OF_SPREAD, 0) + 1);
+                    object.addChildToBack(transformedSpreadNode);
                 } else {
-                    properties[i++] = propKey;
-                }
+                    ObjectProperty prop = (ObjectProperty) abstractProp;
+                    Object propKey = Parser.getPropKey(prop.getKey());
+                    Node inferrableName = null;
+                    if (propKey == null) {
+                        Node theId = transform(prop.getKey());
+                        properties[i++] = theId;
+                    } else {
+                        properties[i++] = propKey;
+                        assert propKey instanceof String || propKey instanceof Integer;
+                        inferrableName = parser.createName(Objects.toString(propKey));
+                        inferrableName.setLineColumnNumber(
+                                prop.getKey().getLineno(), prop.getKey().getColumn());
+                    }
 
-                Node right = transform(prop.getRight());
-                if (prop.isGetterMethod()) {
-                    right = createUnary(Token.GET, right);
-                } else if (prop.isSetterMethod()) {
-                    right = createUnary(Token.SET, right);
-                } else if (prop.isNormalMethod()) {
-                    right = createUnary(Token.METHOD, right);
+                    Node right = transform(prop.getValue());
+                    if (inferrableName != null) {
+                        inferNameIfMissing(
+                                inferrableName,
+                                right,
+                                prop.isGetterMethod()
+                                        ? "get "
+                                        : prop.isSetterMethod() ? "set " : null);
+                    }
+
+                    if (prop.isGetterMethod()) {
+                        right = createUnary(Token.GET, right);
+                    } else if (prop.isSetterMethod()) {
+                        right = createUnary(Token.SET, right);
+                    } else if (prop.isNormalMethod()) {
+                        right = createUnary(Token.METHOD, right);
+                    }
+                    object.addChildToBack(right);
                 }
-                object.addChildToBack(right);
             }
         }
         object.putProp(Node.OBJECT_IDS_PROP, properties);
@@ -1009,13 +1072,13 @@ public final class IRFactory {
         Node pn = Node.newString("");
         for (AstNode elem : elems) {
             if (elem.getType() != Token.TEMPLATE_CHARS) {
-                pn = createBinary(Token.ADD, pn, transform(elem));
+                pn = createBinary(Token.STRING_CONCAT, pn, transform(elem));
             } else {
                 TemplateCharacters chars = (TemplateCharacters) elem;
                 // skip empty parts, e.g. `xx${expr}xx` where xx denotes the empty string
                 String value = chars.getValue();
                 if (value.length() > 0) {
-                    pn = createBinary(Token.ADD, pn, Node.newString(value));
+                    pn = createBinary(Token.STRING_CONCAT, pn, Node.newString(value));
                 }
             }
         }
@@ -1057,11 +1120,13 @@ public final class IRFactory {
     private Node transformScript(ScriptNode node) {
         if (parser.currentScope != null) Kit.codeBug();
         parser.currentScope = node;
+        outerScopeIsStrict = node.isInStrictMode();
         Node body = new Node(Token.BLOCK);
         for (Node kid : node) {
             body.addChildToBack(transform((AstNode) kid));
         }
         node.removeChildren();
+
         Node children = body.getFirstChild();
         if (children != null) {
             node.addChildrenToBack(children);
@@ -1115,30 +1180,44 @@ public final class IRFactory {
         // instead of:
         //     goto labelDefault;
 
-        Node switchExpr = transform(node.getExpression());
-        node.addChildToBack(switchExpr);
+        Scope block = Scope.splitScope(node);
+        block.setLineColumnNumber(node.getLineno(), node.getColumn());
+        block.addChildToBack(node);
+        node.setParentScope(block);
 
-        Node block = new Node(Token.BLOCK, node, node.getLineno(), node.getColumn());
+        // Can't use pushScope/popScope here since splitScope moves the symbol table
+        // We set currentScope to 'node' (not 'block') so nested scopes can be pushed,
+        // since their parent pointers were set to 'node' during parsing. Variable resolution
+        // works correctly because it walks up the parentScope chain, where node.parentScope =
+        // block.
+        Scope savedScope = parser.currentScope;
+        parser.currentScope = node;
+        try {
+            Node switchExpr = transform(node.getExpression());
+            node.addChildToBack(switchExpr);
 
-        for (SwitchCase sc : node.getCases()) {
-            AstNode expr = sc.getExpression();
-            Node caseExpr = null;
+            for (SwitchCase sc : node.getCases()) {
+                AstNode expr = sc.getExpression();
+                Node caseExpr = null;
 
-            if (expr != null) {
-                caseExpr = transform(expr);
-            }
-
-            List<AstNode> stmts = sc.getStatements();
-            Node body = new Block();
-            if (stmts != null) {
-                for (AstNode kid : stmts) {
-                    body.addChildToBack(transform(kid));
+                if (expr != null) {
+                    caseExpr = transform(expr);
                 }
+
+                List<AstNode> stmts = sc.getStatements();
+                Node body = new Block();
+                if (stmts != null) {
+                    for (AstNode kid : stmts) {
+                        body.addChildToBack(transform(kid));
+                    }
+                }
+                addSwitchCase(block, caseExpr, body);
             }
-            addSwitchCase(block, caseExpr, body);
+            closeSwitch(block);
+            return block;
+        } finally {
+            parser.currentScope = savedScope;
         }
-        closeSwitch(block);
-        return block;
     }
 
     private Node transformThrow(ThrowStatement node) {
@@ -1154,22 +1233,61 @@ public final class IRFactory {
 
         Node catchBlocks = new Block();
         for (CatchClause cc : node.getCatchClauses()) {
-            Name varName = cc.getVarName();
+            AstNode varName = cc.getVarName();
             Node catchCond = null;
             Node varNameNode = null;
+            Scope catchBody = cc.getBody();
 
             if (varName != null) {
-                varNameNode = parser.createName(varName.getIdentifier());
+                if (varName instanceof Name) {
+                    // Simple identifier
+                    varNameNode = parser.createName(((Name) varName).getIdentifier());
 
-                AstNode ccc = cc.getCatchCondition();
-                if (ccc != null) {
-                    catchCond = transform(ccc);
-                } else {
+                    AstNode ccc = cc.getCatchCondition();
+                    if (ccc != null) {
+                        catchCond = transform(ccc);
+                    } else {
+                        catchCond = new EmptyExpression();
+                    }
+                } else if (varName instanceof org.mozilla.javascript.ast.ArrayLiteral
+                        || varName instanceof org.mozilla.javascript.ast.ObjectLiteral) {
+                    // Destructuring pattern. We basically replace:
+                    //   catch ( {message} ) { body }
+                    // into:
+                    //   catch ( $tempname ) { let {message} = $tempname; body }
+
+                    // The exception will be stored in the temp name
+                    String tempVarName = parser.currentScriptOrFn.getNextTempName();
+                    varNameNode = parser.createName(tempVarName);
+
+                    // The let statement will be used to do the destructuring
+                    VariableDeclaration letStatement = new VariableDeclaration();
+                    letStatement.setType(Token.LET);
+
+                    VariableInitializer letVar = new VariableInitializer();
+                    letStatement.addVariable(letVar);
+
+                    // LHS: the destructuring declaration
+                    letVar.setTarget(varName);
+
+                    // RHS: the temp name (which we need to wrap in a new name node)
+                    Name tempVarNameNode = new Name();
+                    tempVarNameNode.setIdentifier(tempVarName);
+                    letVar.setInitializer(tempVarNameNode);
+
+                    // Prepend the destructuring "let" to the catch body
+                    catchBody.addChildToFront(letStatement);
+
+                    // Our non-standard condition is not supported for destructuring (we throw an
+                    // error at parse time), so here we can simply force it to an empty expression
                     catchCond = new EmptyExpression();
+                } else {
+                    throw new IllegalArgumentException(
+                            "Unexpected catch parameter type: " + varName.getClass().getName());
                 }
             }
 
-            Node body = transform(cc.getBody());
+            Node body = transform(catchBody);
 
             catchBlocks.addChildToBack(
                     createCatch(varNameNode, catchCond, body, cc.getLineno(), cc.getColumn()));
@@ -1236,6 +1354,7 @@ public final class IRFactory {
                     }
                 }
             } else {
+                inferNameIfMissing(left, right, null);
                 if (right != null) {
                     left.addChildToBack(right);
                 }
@@ -1267,6 +1386,11 @@ public final class IRFactory {
         Node kid = node.getValue() == null ? null : transform(node.getValue());
         if (kid != null) return new Node(node.getType(), kid, node.getLineno(), node.getColumn());
         return new Node(node.getType(), node.getLineno(), node.getColumn());
+    }
+
+    private Node transformSpread(Spread node) {
+        Node kid = transform(node.getExpression());
+        return new Node(node.getType(), kid, node.getLineno(), node.getColumn());
     }
 
     private Node transformXmlLiteral(XmlLiteral node) {
@@ -1416,15 +1540,20 @@ public final class IRFactory {
         return new Node(Token.CATCH, varName, catchCond, stmts, lineno, column);
     }
 
-    private static Node initFunction(
+    private Node initFunction(
             FunctionNode fnNode, int functionIndex, Node statements, int functionType) {
         fnNode.setFunctionType(functionType);
         fnNode.addChildToBack(statements);
+
+        if (outerScopeIsStrict && !fnNode.isInStrictMode()) {
+            fnNode.setInStrictMode(true);
+        }
 
         int functionCount = fnNode.getFunctionCount();
         if (functionCount != 0) {
             // Functions containing other functions require activation objects
             fnNode.setRequiresActivation();
+            propagateRequiresArgumentObjectFromNestedArrowFunctions(fnNode);
         }
 
         if (functionType == FunctionNode.FUNCTION_EXPRESSION) {
@@ -1460,6 +1589,28 @@ public final class IRFactory {
         Node result = Node.newString(Token.FUNCTION, fnNode.getName());
         result.putIntProp(Node.FUNCTION_PROP, functionIndex);
         return result;
+    }
+
+    private static void propagateRequiresArgumentObjectFromNestedArrowFunctions(
+            FunctionNode fnNode) {
+        if (fnNode.requiresArgumentObject()) {
+            return;
+        }
+
+        // If a nested lambda needs arguments, the outer function needs them too.
+        Queue<FunctionNode> toVisit = new ArrayDeque<>(fnNode.getFunctions());
+        while (!toVisit.isEmpty()) {
+            FunctionNode nestedFunction = toVisit.poll();
+            if (nestedFunction.getFunctionType() == FunctionNode.ARROW_FUNCTION) {
+                if (nestedFunction.requiresArgumentObject()) {
+                    fnNode.setRequiresArgumentObject();
+                    return;
+                }
+
+                // All nested arrow functions, recursively
+                toVisit.addAll(nestedFunction.getFunctions());
+            }
+        }
     }
 
     /**
@@ -1879,6 +2030,10 @@ public final class IRFactory {
                         child.setType(Token.BINDNAME);
                         Node right = Node.newString(child.getString());
                         n = new Node(nodeType, child, right);
+                    } else if (childType == Token.UNDEFINED) {
+                        Node name = Node.newString(Token.BINDNAME, "undefined");
+                        Node right = Node.newString("undefined");
+                        n = new Node(nodeType, name, right);
                     } else if (childType == Token.GETPROP || childType == Token.GETELEM) {
                         Node left = child.getFirstChild();
                         Node right = child.getLastChild();
@@ -1943,14 +2098,14 @@ public final class IRFactory {
         int type = Node.NON_SPECIALCALL;
         if (child.getType() == Token.NAME) {
             String name = child.getString();
-            if (name.equals("eval")) {
+            if ("eval".equals(name)) {
                 type = Node.SPECIALCALL_EVAL;
-            } else if (name.equals("With")) {
+            } else if ("With".equals(name)) {
                 type = Node.SPECIALCALL_WITH;
             }
         } else if (child.getType() == Token.GETPROP) {
             String name = child.getLastChild().getString();
-            if (name.equals("eval")) {
+            if ("eval".equals(name)) {
                 type = Node.SPECIALCALL_EVAL;
             }
         }
@@ -1995,23 +2150,9 @@ public final class IRFactory {
                 return parser.createName(name);
             }
             parser.checkActivationName(name, Token.GETPROP);
-            if (ScriptRuntime.isSpecialProperty(name)) {
-                if (target.getType() == Token.SUPER) {
-                    // We have an access to super.__proto__ or super.__parent__.
-                    // This needs to behave in the same way as this.__proto__ - it really is not
-                    // obvious why, but you can test it in v8 or any other engine. So, we just
-                    // replace SUPER with THIS in the AST. It's a bit hacky, but it works - see the
-                    // test cases in SuperTest!
-                    if (!(target instanceof KeywordLiteral)) {
-                        throw Kit.codeBug();
-                    }
-                    KeywordLiteral oldTarget = (KeywordLiteral) target;
-                    target =
-                            new KeywordLiteral(
-                                    oldTarget.getPosition(), oldTarget.getLength(), Token.THIS);
-                    target.setLineColumnNumber(oldTarget.getLineno(), oldTarget.getColumn());
-                }
 
+            if (parser.compilerEnv.getLanguageVersion() < Context.VERSION_ES6
+                    && ScriptRuntime.isSpecialProperty(name)) {
                 Node ref = new Node(Token.REF_SPECIAL, target);
                 ref.putProp(Node.NAME_PROP, name);
                 Node getRef = new Node(Token.GET_REF, ref);
@@ -2058,7 +2199,7 @@ public final class IRFactory {
         Node nsNode = null;
         if (namespace != null) {
             // See 11.1.2 in ECMA 357
-            if (namespace.equals("*")) {
+            if ("*".equals(namespace)) {
                 nsNode = new Node(Token.NULL);
             } else {
                 nsNode = parser.createName(namespace);
@@ -2317,6 +2458,31 @@ public final class IRFactory {
         throw Kit.codeBug();
     }
 
+    /** Infer function name is missing on rhs. In the future, should also handle class names. */
+    private void inferNameIfMissing(Object left, Node right, String prefix) {
+        if (parser.compilerEnv.getLanguageVersion() < Context.VERSION_ES6) {
+            return;
+        }
+
+        if (left instanceof Name && right != null && right.type == Token.FUNCTION) {
+            Name name = (Name) left;
+            if (name.getIdentifier().equals(NativeObject.PROTO_PROPERTY)) {
+                // Ignore weird edge case
+                return;
+            }
+
+            var fnIndex = right.getExistingIntProp(Node.FUNCTION_PROP);
+            FunctionNode functionNode = parser.currentScriptOrFn.getFunctionNode(fnIndex);
+            if (functionNode.getType() != 0 && functionNode.getFunctionName() == null) {
+                if (prefix != null) {
+                    functionNode.setFunctionName(name.withPrefix(prefix));
+                } else {
+                    functionNode.setFunctionName(name);
+                }
+            }
+        }
+    }
+
     private Node propagateSuperFromLhs(Node result, Node left) {
         if (left.getIntProp(Node.SUPER_PROPERTY_ACCESS, 0) == 1) {
             result.putIntProp(Node.SUPER_PROPERTY_ACCESS, 1);
@@ -2341,6 +2507,7 @@ public final class IRFactory {
         int type = node.getType();
         switch (type) {
             case Token.NAME:
+            case Token.UNDEFINED:
             case Token.GETPROP:
             case Token.GETELEM:
             case Token.GET_REF:
@@ -2358,6 +2525,7 @@ public final class IRFactory {
         switch (node.getType()) {
             case Token.FALSE:
             case Token.NULL:
+            case Token.UNDEFINED:
                 return ALWAYS_FALSE_BOOLEAN;
             case Token.TRUE:
                 return ALWAYS_TRUE_BOOLEAN;

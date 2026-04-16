@@ -12,17 +12,20 @@ dependencies {
     implementation project(':rhino-xml')
 
     testImplementation project(':testutils')
-    testImplementation("com.tngtech.archunit:archunit-junit4:1.4.0") {
+    testImplementation("com.tngtech.archunit:archunit-junit4:1.4.1") {
         exclude group: 'junit'
     }
-    testImplementation("org.slf4j:slf4j-simple:2.0.16")
+    testImplementation("org.slf4j:slf4j-simple:2.0.17")
+    testImplementation "org.yaml:snakeyaml:2.5"
+    testImplementation "javax.xml.soap:javax.xml.soap-api:1.4.0"
+    testImplementation "javax.activation:javax.activation-api:1.2.0"
 }
 
 tasks.withType(JavaCompile) {
     // We have deprecated things, like "optimization level", and have
     // not yet removed them from all tests, so turn this warning off.
     options.compilerArgs = [
-            '-Xlint:-deprecation'
+            '-Xlint:-deprecation,unchecked'
     ]
 }
 
@@ -64,7 +67,7 @@ test {
 
     jacoco {
         // These particular tests produce Jacoco exceptions because of their size
-        excludes = ['**perlstress**', '**start_unicode**']
+        excludes = ['**perlstress**', '**start_unicode**', '**ojsc**']
     }
 }
 

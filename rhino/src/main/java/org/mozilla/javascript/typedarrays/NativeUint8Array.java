@@ -10,6 +10,7 @@ import org.mozilla.javascript.Context;
 import org.mozilla.javascript.LambdaConstructor;
 import org.mozilla.javascript.ScriptRuntimeES6;
 import org.mozilla.javascript.Scriptable;
+import org.mozilla.javascript.ScriptableObject;
 import org.mozilla.javascript.Undefined;
 
 /**
@@ -55,6 +56,7 @@ public class NativeUint8Array extends NativeTypedArrayView<Integer> {
         ScriptRuntimeES6.addSymbolSpecies(cx, scope, constructor);
         if (sealed) {
             constructor.sealObject();
+            ((ScriptableObject) constructor.getPrototypeProperty()).sealObject();
         }
         return constructor;
     }
@@ -78,27 +80,23 @@ public class NativeUint8Array extends NativeTypedArrayView<Integer> {
 
     @Override
     protected Object js_set(int index, Object c) {
+        int val = Conversions.toUint8(c);
         if (checkIndex(index)) {
             return Undefined.instance;
         }
-        int val = Conversions.toUint8(c);
         ByteIo.writeUint8(arrayBuffer.buffer, index + offset, val);
         return null;
     }
 
     @Override
     public Integer get(int i) {
-        if (checkIndex(i)) {
-            throw new IndexOutOfBoundsException();
-        }
+        ensureIndex(i);
         return (Integer) js_get(i);
     }
 
     @Override
     public Integer set(int i, Integer aByte) {
-        if (checkIndex(i)) {
-            throw new IndexOutOfBoundsException();
-        }
+        ensureIndex(i);
         return (Integer) js_set(i, aByte);
     }
 }

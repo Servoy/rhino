@@ -6,7 +6,6 @@
 
 package org.mozilla.javascript.tools.shell;
 
-import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
@@ -16,7 +15,6 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.ObjectInputStream;
-import java.io.OutputStream;
 import java.io.PrintStream;
 import java.io.Reader;
 import java.lang.reflect.InvocationTargetException;
@@ -280,7 +278,7 @@ public class Global extends ImporterTopLevel {
      * @exception InstantiationException if unable to instantiate the named class
      * @exception InvocationTargetException if an exception is thrown during execution of methods of
      *     the named class
-     * @see org.mozilla.javascript.ScriptableObject#defineClass(Scriptable,Class)
+     * @see org.mozilla.javascript.ScriptableObject#defineClass(Scriptable, Class)
      */
     @SuppressWarnings({"unchecked"})
     public static void defineClass(Context cx, Scriptable thisObj, Object[] args, Function funObj)
@@ -312,7 +310,7 @@ public class Global extends ImporterTopLevel {
             throw reportRuntimeError("msg.must.implement.Script");
         }
         Script script = (Script) clazz.getDeclaredConstructor().newInstance();
-        script.exec(cx, thisObj);
+        script.exec(cx, thisObj, thisObj);
     }
 
     private static Class<?> getClass(Object[] args) {
@@ -521,39 +519,56 @@ public class Global extends ImporterTopLevel {
     /**
      * The spawn function runs a given function or script in a different thread.
      *
-     * <p>js&gt; function g() { a = 7; } js&gt; a = 3; 3 js&gt; spawn(g) Thread[Thread-1,5,main]
-     * js&gt; a 3
+     * <pre>
+     * js&gt; function g() { a = 7; }
+     * js&gt; a = 3; 3
+     * js&gt; spawn(g) Thread[Thread-1,5,main]
+     * js&gt; a 7
+     * </pre>
      */
     public static Object spawn(Context cx, Scriptable thisObj, Object[] args, Function funObj) {
         Scriptable scope = funObj.getParentScope();
-        Runner runner;
+        ContextAction<?> action = getAsyncAction(cx, args, scope);
+        ContextFactory factory = cx.getFactory();
+        Thread thread = new Thread(() -> factory.call(action));
+        thread.start();
+        return cx.getWrapFactory().wrap(cx, scope, thread, Thread.class);
+    }
+
+    private static ContextAction<Object> getAsyncAction(
+            Context cx, Object[] args, Scriptable scope) {
+        ContextAction<Object> action;
         if (args.length != 0 && args[0] instanceof Function) {
-            Object[] newArgs = null;
-            if (args.length > 1 && args[1] instanceof Scriptable) {
-                newArgs = cx.getElements((Scriptable) args[1]);
-            }
-            if (newArgs == null) {
-                newArgs = ScriptRuntime.emptyArgs;
-            }
-            runner = new Runner(scope, (Function) args[0], newArgs);
+            Function f = (Function) args[0];
+            Object[] newArgs =
+                    args.length > 1 && args[1] instanceof Scriptable
+                            ? cx.getElements((Scriptable) args[1])
+                            : ScriptRuntime.emptyArgs;
+            action = cx2 -> f.call(cx2, scope, scope, newArgs);
         } else if (args.length != 0 && args[0] instanceof Script) {
-            runner = new Runner(scope, (Script) args[0]);
+            Script s = (Script) args[0];
+            action = cx2 -> s.exec(cx2, scope, scope);
         } else {
             throw reportRuntimeError("msg.spawn.args");
         }
-        runner.factory = cx.getFactory();
-        Thread thread = new Thread(runner);
-        thread.start();
-        return thread;
+        return action;
     }
 
     /**
      * The sync function creates a synchronized function (in the sense of a Java synchronized
      * method) from an existing function. The new function synchronizes on the the second argument
-     * if it is defined, or otherwise the <code>this</code> object of its invocation. js&gt; var o =
-     * { f : sync(function(x) { print("entry"); Packages.java.lang.Thread.sleep(x*1000);
-     * print("exit"); })}; js&gt; spawn(function() {o.f(5);}); Thread[Thread-0,5,main] entry js&gt;
-     * spawn(function() {o.f(5);}); Thread[Thread-1,5,main] js&gt; exit entry exit
+     * if it is defined, or otherwise the <code>this</code> object of its invocation.
+     *
+     * <pre>
+     * js&gt; var o = { f : sync(function(x) {
+     *                             print("entry");
+     *                             Packages.java.lang.Thread.sleep(x*1000);
+     *                             print("exit");
+     *                           })};
+     * js&gt; spawn(function() {o.f(5);}); Thread[Thread-0,5,main] entry
+     * js&gt; spawn(function() {o.f(5);}); Thread[Thread-1,5,main]
+     * js&gt; exit entry exit
+     * </pre>
      */
     public static Object sync(Context cx, Scriptable thisObj, Object[] args, Function funObj) {
         if (args.length >= 1 && args.length <= 2 && args[0] instanceof Function) {
@@ -600,119 +615,13 @@ public class Global extends ImporterTopLevel {
      *       string, appended to the err property value converted to string and put as the new value
      *       of the err property.
      *   <li><code>dir</code> - the working direcotry to run the commands.
+     *   <li><code>timeout</code> - the maximum process runtime in milliseconds
      * </ul>
      */
-    @SuppressWarnings("AndroidJdkLibsChecker")
     public static Object runCommand(Context cx, Scriptable thisObj, Object[] args, Function funObj)
             throws IOException {
-        int L = args.length;
-        if (L == 0 || (L == 1 && args[0] instanceof Scriptable)) {
-            throw reportRuntimeError("msg.runCommand.bad.args");
-        }
-        File wd = null;
-        InputStream in = null;
-        OutputStream out = null, err = null;
-        ByteArrayOutputStream outBytes = null, errBytes = null;
-        Object outObj = null, errObj = null;
-        String[] environment = null;
-        Scriptable params = null;
-        Object[] addArgs = null;
-        if (args[L - 1] instanceof Scriptable) {
-            params = (Scriptable) args[L - 1];
-            --L;
-            Object envObj = ScriptableObject.getProperty(params, "env");
-            if (envObj != Scriptable.NOT_FOUND) {
-                if (envObj == null) {
-                    environment = new String[0];
-                } else {
-                    if (!(envObj instanceof Scriptable)) {
-                        throw reportRuntimeError("msg.runCommand.bad.env");
-                    }
-                    Scriptable envHash = (Scriptable) envObj;
-                    Object[] ids = ScriptableObject.getPropertyIds(envHash);
-                    environment = new String[ids.length];
-                    for (int i = 0; i != ids.length; ++i) {
-                        Object keyObj = ids[i], val;
-                        String key;
-                        if (keyObj instanceof String) {
-                            key = (String) keyObj;
-                            val = ScriptableObject.getProperty(envHash, key);
-                        } else {
-                            int ikey = ((Number) keyObj).intValue();
-                            key = Integer.toString(ikey);
-                            val = ScriptableObject.getProperty(envHash, ikey);
-                        }
-                        if (val == ScriptableObject.NOT_FOUND) {
-                            val = Undefined.instance;
-                        }
-                        environment[i] = key + '=' + ScriptRuntime.toString(val);
-                    }
-                }
-            }
-            Object wdObj = ScriptableObject.getProperty(params, "dir");
-            if (wdObj != Scriptable.NOT_FOUND) {
-                wd = new File(ScriptRuntime.toString(wdObj));
-            }
 
-            Object inObj = ScriptableObject.getProperty(params, "input");
-            if (inObj != Scriptable.NOT_FOUND) {
-                in = toInputStream(inObj);
-            }
-            outObj = ScriptableObject.getProperty(params, "output");
-            if (outObj != Scriptable.NOT_FOUND) {
-                out = toOutputStream(outObj);
-                if (out == null) {
-                    outBytes = new ByteArrayOutputStream();
-                    out = outBytes;
-                }
-            }
-            errObj = ScriptableObject.getProperty(params, "err");
-            if (errObj != Scriptable.NOT_FOUND) {
-                err = toOutputStream(errObj);
-                if (err == null) {
-                    errBytes = new ByteArrayOutputStream();
-                    err = errBytes;
-                }
-            }
-            Object addArgsObj = ScriptableObject.getProperty(params, "args");
-            if (addArgsObj != Scriptable.NOT_FOUND) {
-                Scriptable s = Context.toObject(addArgsObj, getTopLevelScope(thisObj));
-                addArgs = cx.getElements(s);
-            }
-        }
-        Global global = getInstance(funObj);
-        if (out == null) {
-            out = global.getOut();
-        }
-        if (err == null) {
-            err = global.getErr();
-        }
-        // If no explicit input stream, do not send any input to process,
-        // in particular, do not use System.in to avoid deadlocks
-        // when waiting for user input to send to process which is already
-        // terminated as it is not always possible to interrupt read method.
-
-        String[] cmd = new String[(addArgs == null) ? L : L + addArgs.length];
-        for (int i = 0; i != L; ++i) {
-            cmd[i] = ScriptRuntime.toString(args[i]);
-        }
-        if (addArgs != null) {
-            for (int i = 0; i != addArgs.length; ++i) {
-                cmd[L + i] = ScriptRuntime.toString(addArgs[i]);
-            }
-        }
-
-        int exitCode = runProcess(cmd, environment, wd, in, out, err);
-        if (outBytes != null) {
-            String s = ScriptRuntime.toString(outObj) + outBytes.toString(StandardCharsets.UTF_8);
-            ScriptableObject.putProperty(params, "output", s);
-        }
-        if (errBytes != null) {
-            String s = ScriptRuntime.toString(errObj) + errBytes.toString(StandardCharsets.UTF_8);
-            ScriptableObject.putProperty(params, "err", s);
-        }
-
-        return exitCode;
+        return ExecUtil.runCommand(getInstance(funObj), thisObj, args);
     }
 
     /** The seal function seals all supplied arguments. */
@@ -852,159 +761,6 @@ public class Global extends ImporterTopLevel {
         return (Global) scope;
     }
 
-    /**
-     * Runs the given process using Runtime.exec(). If any of in, out, err is null, the
-     * corresponding process stream will be closed immediately, otherwise it will be closed as soon
-     * as all data will be read from/written to process
-     *
-     * @return Exit value of process.
-     * @throws IOException If there was an error executing the process.
-     */
-    private static int runProcess(
-            String[] cmd,
-            String[] environment,
-            File wd,
-            InputStream in,
-            OutputStream out,
-            OutputStream err)
-            throws IOException {
-        Process p;
-        if (environment == null) {
-            p = Runtime.getRuntime().exec(cmd, null, wd);
-        } else {
-            p = Runtime.getRuntime().exec(cmd, environment, wd);
-        }
-
-        try {
-            PipeThread inThread = null;
-            if (in != null) {
-                inThread = new PipeThread(false, in, p.getOutputStream());
-                inThread.start();
-            } else {
-                p.getOutputStream().close();
-            }
-
-            PipeThread outThread = null;
-            if (out != null) {
-                outThread = new PipeThread(true, p.getInputStream(), out);
-                outThread.start();
-            } else {
-                p.getInputStream().close();
-            }
-
-            PipeThread errThread = null;
-            if (err != null) {
-                errThread = new PipeThread(true, p.getErrorStream(), err);
-                errThread.start();
-            } else {
-                p.getErrorStream().close();
-            }
-
-            // wait for process completion
-            for (; ; ) {
-                try {
-                    p.waitFor();
-                    if (outThread != null) {
-                        outThread.join();
-                    }
-                    if (inThread != null) {
-                        inThread.join();
-                    }
-                    if (errThread != null) {
-                        errThread.join();
-                    }
-                    break;
-                } catch (InterruptedException ignore) {
-                }
-            }
-
-            return p.exitValue();
-        } finally {
-            p.destroy();
-        }
-    }
-
-    static void pipe(boolean fromProcess, InputStream from, OutputStream to) throws IOException {
-        try {
-            final int SIZE = 4096;
-            byte[] buffer = new byte[SIZE];
-            for (; ; ) {
-                int n;
-                if (!fromProcess) {
-                    n = from.read(buffer, 0, SIZE);
-                } else {
-                    try {
-                        n = from.read(buffer, 0, SIZE);
-                    } catch (IOException ex) {
-                        // Ignore exception as it can be cause by closed pipe
-                        break;
-                    }
-                }
-                if (n < 0) {
-                    break;
-                }
-                if (fromProcess) {
-                    to.write(buffer, 0, n);
-                    to.flush();
-                } else {
-                    try {
-                        to.write(buffer, 0, n);
-                        to.flush();
-                    } catch (IOException ex) {
-                        // Ignore exception as it can be cause by closed pipe
-                        break;
-                    }
-                }
-            }
-        } finally {
-            try {
-                if (fromProcess) {
-                    from.close();
-                } else {
-                    to.close();
-                }
-            } catch (IOException ex) {
-                // Ignore errors on close. On Windows JVM may throw invalid
-                // refrence exception if process terminates too fast.
-            }
-        }
-    }
-
-    private static InputStream toInputStream(Object value) throws IOException {
-        InputStream is = null;
-        String s = null;
-        if (value instanceof Wrapper) {
-            Object unwrapped = ((Wrapper) value).unwrap();
-            if (unwrapped instanceof InputStream) {
-                is = (InputStream) unwrapped;
-            } else if (unwrapped instanceof byte[]) {
-                is = new ByteArrayInputStream((byte[]) unwrapped);
-            } else if (unwrapped instanceof Reader) {
-                s = readReader((Reader) unwrapped);
-            } else if (unwrapped instanceof char[]) {
-                s = new String((char[]) unwrapped);
-            }
-        }
-        if (is == null) {
-            if (s == null) {
-                s = ScriptRuntime.toString(value);
-            }
-            is = new ByteArrayInputStream(s.getBytes(StandardCharsets.UTF_8));
-        }
-        return is;
-    }
-
-    private static OutputStream toOutputStream(Object value) {
-        OutputStream os = null;
-        if (value instanceof Wrapper) {
-            Object unwrapped = ((Wrapper) value).unwrap();
-            if (unwrapped instanceof OutputStream) {
-                os = (OutputStream) unwrapped;
-            }
-        }
-        return os;
-    }
-
     private static String readUrl(String filePath, String charCoding, boolean urlIsFile)
             throws IOException {
         int chunkLength;
@@ -1103,7 +859,7 @@ public class Global extends ImporterTopLevel {
         return null;
     }
 
-    private static String readReader(Reader reader) throws IOException {
+    static String readReader(Reader reader) throws IOException {
         return readReader(reader, 4096);
     }
 
@@ -1134,58 +890,15 @@ public class Global extends ImporterTopLevel {
         String message = ToolErrorReporter.getMessage(msgId, msgArg);
         return Context.reportRuntimeError(message);
     }
-}
 
-class Runner implements Runnable, ContextAction<Object> {
-
-    Runner(Scriptable scope, Function func, Object[] args) {
-        this.scope = scope;
-        f = func;
-        this.args = args;
+    /**
+     * optioal interface to specify a launcher, that creates a process for the runCommand method.
+     *
+     * <p>Note: This is mainly for unit testing
+     */
+    @SuppressWarnings("AndroidJdkLibsChecker")
+    @FunctionalInterface
+    public interface CommandExecutor {
+        Process exec(String[] cmdarray, String[] envp, File dir) throws IOException;
     }
-
-    Runner(Scriptable scope, Script script) {
-        this.scope = scope;
-        s = script;
-    }
-
-    @Override
-    public void run() {
-        factory.call(this);
-    }
-
-    @Override
-    public Object run(Context cx) {
-        if (f != null) return f.call(cx, scope, scope, args);
-        else return s.exec(cx, scope);
-    }
-
-    ContextFactory factory;
-    private Scriptable scope;
-    private Function f;
-    private Script s;
-    private Object[] args;
-}
-
-class PipeThread extends Thread {
-
-    PipeThread(boolean fromProcess, InputStream from, OutputStream to) {
-        setDaemon(true);
-        this.fromProcess = fromProcess;
-        this.from = from;
-        this.to = to;
-    }
-
-    @Override
-    public void run() {
-        try {
-            Global.pipe(fromProcess, from, to);
-        } catch (IOException ex) {
-            throw Context.throwAsScriptRuntimeEx(ex);
-        }
-    }
-
-    private boolean fromProcess;
-    private InputStream from;
-    private OutputStream to;
 }

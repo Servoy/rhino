@@ -23,7 +23,7 @@ public class NativeWeakSet extends ScriptableObject {
 
     private boolean instanceOfWeakSet = false;
 
-    private transient WeakHashMap<Scriptable, Boolean> map = new WeakHashMap<>();
+    private transient WeakHashMap<Object, Boolean> map = new WeakHashMap<>();
 
     static Object init(Context cx, Scriptable scope, boolean sealed) {
         LambdaConstructor constructor =
@@ -35,30 +35,9 @@ public class NativeWeakSet extends ScriptableObject {
                         NativeWeakSet::jsConstructor);
         constructor.setPrototypePropertyAttributes(DONTENUM | READONLY | PERMANENT);
 
-        constructor.definePrototypeMethod(
-                scope,
-                "add",
-                1,
-                (Context lcx, Scriptable lscope, Scriptable thisObj, Object[] args) ->
-                        realThis(thisObj, "add").js_add(NativeMap.key(args)),
-                DONTENUM,
-                DONTENUM | READONLY);
-        constructor.definePrototypeMethod(
-                scope,
-                "delete",
-                1,
-                (Context lcx, Scriptable lscope, Scriptable thisObj, Object[] args) ->
-                        realThis(thisObj, "delete").js_delete(NativeMap.key(args)),
-                DONTENUM,
-                DONTENUM | READONLY);
-        constructor.definePrototypeMethod(
-                scope,
-                "has",
-                1,
-                (Context lcx, Scriptable lscope, Scriptable thisObj, Object[] args) ->
-                        realThis(thisObj, "has").js_has(NativeMap.key(args)),
-                DONTENUM,
-                DONTENUM | READONLY);
+        constructor.definePrototypeMethod(scope, "add", 1, NativeWeakSet::js_add);
+        constructor.definePrototypeMethod(scope, "delete", 1, NativeWeakSet::js_delete);
+        constructor.definePrototypeMethod(scope, "has", 1, NativeWeakSet::js_has);
 
         constructor.definePrototypeProperty(
                 SymbolKey.TO_STRING_TAG, CLASS_NAME, DONTENUM | READONLY);
@@ -66,6 +45,7 @@ public class NativeWeakSet extends ScriptableObject {
         ScriptRuntimeES6.addSymbolSpecies(cx, scope, constructor);
         if (sealed) {
             constructor.sealObject();
+            ((ScriptableObject) constructor.getPrototypeProperty()).sealObject();
         }
         return constructor;
     }
@@ -84,6 +64,12 @@ public class NativeWeakSet extends ScriptableObject {
         return ns;
     }
 
+    private static Object js_add(Context cx, Scriptable scope, Scriptable thisObj, Object[] args) {
+        NativeWeakSet realThis = realThis(thisObj, "add");
+        var k = NativeMap.key(args);
+        return realThis.js_add(k);
+    }
+
     private Object js_add(Object key) {
         // As the spec says, only a true "Object" can be the key to a WeakSet.
         // Use the default object equality here. ScriptableObject does not override
@@ -94,8 +80,15 @@ public class NativeWeakSet extends ScriptableObject {
         }
         // Add a value to the map, but don't make it the key -- otherwise the WeakHashMap
         // will never GC anything.
-        map.put((Scriptable) key, Boolean.TRUE);
+        map.put(key, Boolean.TRUE);
         return this;
+    }
+
+    private static Object js_delete(
+            Context cx, Scriptable scope, Scriptable thisObj, Object[] args) {
+        NativeWeakSet realThis = realThis(thisObj, "add");
+        var arg = NativeMap.key(args);
+        return realThis.js_delete(arg);
     }
 
     private Object js_delete(Object key) {
@@ -103,6 +96,12 @@ public class NativeWeakSet extends ScriptableObject {
             return Boolean.FALSE;
         }
         return map.remove(key) != null;
+    }
+
+    private static Object js_has(Context cx, Scriptable scope, Scriptable thisObj, Object[] args) {
+        NativeWeakSet realThis = realThis(thisObj, "add");
+        var arg = NativeMap.key(args);
+        return realThis.js_has(arg);
     }
 
     private Object js_has(Object key) {

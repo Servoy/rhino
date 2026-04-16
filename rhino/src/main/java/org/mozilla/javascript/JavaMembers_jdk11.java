@@ -6,20 +6,16 @@
 
 package org.mozilla.javascript;
 
-import java.lang.reflect.AccessibleObject;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
 import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentMap;
 
 /** Version of {@link JavaMembers} for modular JDKs. */
+// servoy patch made public
 public class JavaMembers_jdk11 extends JavaMembers {
-    private static final ConcurrentMap<AccessibleObject, Boolean> cantAccess =
-            new ConcurrentHashMap<>();
 
-    protected JavaMembers_jdk11(Scriptable scope, Class<?> cl, boolean includeProtected) {
+    public JavaMembers_jdk11(Scriptable scope, Class<?> cl, boolean includeProtected) {
         super(scope, cl, includeProtected);
     }
 
@@ -34,20 +30,6 @@ public class JavaMembers_jdk11 extends JavaMembers {
                 registerMethod(map, method);
             }
         }
-    }
-
-    @Override
-    protected boolean makeAccessible(AccessibleObject method, boolean includePrivate) {
-        if (cantAccess.containsKey(method)) return false;
-        try {
-            if (includePrivate) { // && !method.canAccess(null)) {
-                method.setAccessible(true);
-            }
-        } catch (RuntimeException re) {
-            cantAccess.put(method, Boolean.FALSE);
-            return false;
-        }
-        return true;
     }
 
     private static boolean isExportedClass(Class<?> clazz) {

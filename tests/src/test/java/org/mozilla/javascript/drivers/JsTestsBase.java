@@ -13,28 +13,20 @@ import org.junit.BeforeClass;
 import org.mozilla.javascript.Context;
 import org.mozilla.javascript.ContextFactory;
 import org.mozilla.javascript.Scriptable;
+import org.mozilla.javascript.testutils.Utils;
 
 public abstract class JsTestsBase {
-    private int optimizationLevel;
+    private boolean interpretedMode;
 
     private static ContextFactory threadSafeFactory;
 
     @BeforeClass
     public static void init() {
-        threadSafeFactory =
-                new ContextFactory() {
-                    @Override
-                    protected boolean hasFeature(Context cx, int featureIndex) {
-                        if (featureIndex == Context.FEATURE_THREAD_SAFE_OBJECTS) {
-                            return true;
-                        }
-                        return super.hasFeature(cx, featureIndex);
-                    }
-                };
+        threadSafeFactory = Utils.contextFactoryWithFeatures(Context.FEATURE_THREAD_SAFE_OBJECTS);
     }
 
-    public void setOptimizationLevel(int level) {
-        this.optimizationLevel = level;
+    public void setInterpretedMode(boolean interpretedMode) {
+        this.interpretedMode = interpretedMode;
     }
 
     public void runJsTest(Context cx, Scriptable shared, String name, String source) {
@@ -55,7 +47,7 @@ public abstract class JsTestsBase {
 
     public void runJsTests(File[] tests) throws IOException {
         try (Context cx = threadSafeFactory.enterContext()) {
-            cx.setOptimizationLevel(this.optimizationLevel);
+            cx.setInterpretedMode(this.interpretedMode);
             Scriptable shared = cx.initStandardObjects();
             for (File f : tests) {
                 int length = (int) f.length(); // don't worry about very long

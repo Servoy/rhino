@@ -9,6 +9,7 @@ package org.mozilla.javascript;
 import java.io.Serializable;
 import java.lang.reflect.Array;
 import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.math.MathContext;
@@ -25,7 +26,12 @@ import java.util.ServiceLoader;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import org.mozilla.javascript.ast.FunctionNode;
+import org.mozilla.javascript.dtoa.DoubleFormatter;
+import org.mozilla.javascript.lc.type.TypeInfo;
+import org.mozilla.javascript.lc.type.impl.factory.ConcurrentFactory;
 import org.mozilla.javascript.typedarrays.NativeArrayBuffer;
+import org.mozilla.javascript.typedarrays.NativeBigInt64Array;
+import org.mozilla.javascript.typedarrays.NativeBigUint64Array;
 import org.mozilla.javascript.typedarrays.NativeDataView;
 import org.mozilla.javascript.typedarrays.NativeFloat32Array;
 import org.mozilla.javascript.typedarrays.NativeFloat64Array;
@@ -37,7 +43,6 @@ import org.mozilla.javascript.typedarrays.NativeUint32Array;
 import org.mozilla.javascript.typedarrays.NativeUint8Array;
 import org.mozilla.javascript.typedarrays.NativeUint8ClampedArray;
 import org.mozilla.javascript.v8dtoa.DoubleConversion;
-import org.mozilla.javascript.v8dtoa.FastDtoa;
 import org.mozilla.javascript.xml.XMLLib;
 import org.mozilla.javascript.xml.XMLLoader;
 import org.mozilla.javascript.xml.XMLObject;
@@ -55,6 +60,7 @@ public class ScriptRuntime {
     /**
      * Returns representation of the [[ThrowTypeError]] object. See ECMA 5 spec, 13.2.3
      *
+     * @return a {@link BaseFunction}
      * @deprecated {@link #typeErrorThrower(Context)}
      */
     @Deprecated
@@ -65,26 +71,48 @@ public class ScriptRuntime {
     /** Returns representation of the [[ThrowTypeError]] object. See ECMA 5 spec, 13.2.3 */
     public static BaseFunction typeErrorThrower(Context cx) {
         if (cx.typeErrorThrower == null) {
-            BaseFunction thrower =
-                    new BaseFunction() {
-                        private static final long serialVersionUID = -5891740962154902286L;
-
-                        @Override
-                        public Object call(
-                                Context cx, Scriptable scope, Scriptable thisObj, Object[] args) {
-                            throw typeErrorById("msg.op.not.allowed");
-                        }
-
-                        @Override
-                        public int getLength() {
-                            return 0;
-                        }
-                    };
-            ScriptRuntime.setFunctionProtoAndParent(thrower, cx, cx.topCallScope, false);
-            thrower.preventExtensions();
+            BaseFunction thrower = new ThrowTypeError(cx.topCallScope);
             cx.typeErrorThrower = thrower;
         }
         return cx.typeErrorThrower;
+    }
+
+    private static final class ThrowTypeError extends BaseFunction {
+        private static final long serialVersionUID = -5891740962154902286L;
+
+        ThrowTypeError(Scriptable scope) {
+            setPrototype(ScriptableObject.getFunctionPrototype(scope));
+
+            setAttributes("length", DONTENUM | PERMANENT | READONLY);
+            setAttributes("name", DONTENUM | PERMANENT | READONLY);
+
+            // delete arity and arguments (without further checking)
+            getMap().compute(this, "arity", 0, ThrowTypeError::removeWithoutChecking);
+            getMap().compute(this, "arguments", 0, ThrowTypeError::removeWithoutChecking);
+
+            preventExtensions();
+        }
+
+        private static Slot removeWithoutChecking(
+                Object key,
+                int index,
+                Slot slot,
+                CompoundOperationMap compoundOp,
+                SlotMapOwner owner) {
+            return null;
+        }
+
+        @Override
+        public Object call(Context cx, Scriptable scope, Scriptable thisObj, Object[] args) {
+            throw typeErrorById("msg.op.not.allowed");
+        }
+    }
+
+    public static Object concat(Object lhs, Object rhs) {
+        String rhsString = ScriptRuntime.toString(rhs);
+        String lhsString = ScriptRuntime.toString(lhs);
+
+        return new ConsString(lhsString, rhsString);
     }
 
     static class NoSuchMethodShim implements Callable {
@@ -101,7 +129,7 @@ public class ScriptRuntime {
          *
          * @param cx the current Context for this thread
          * @param scope the scope to use to resolve properties.
-         * @param thisObj the JavaScript <code>this</code> object
+         * @param thisObj the JavaScript {@code this} object
          * @param args the array of arguments
          * @return the result of the call
          */
@@ -124,7 +152,6 @@ public class ScriptRuntime {
      * 'standard' classes - especially those in java.lang, we can trust
      * that they won't cause problems by being loaded early.
      */
-
     public static final Class<?> BooleanClass = Kit.classOrNull("java.lang.Boolean"),
             ByteClass = Kit.classOrNull("java.lang.Byte"),
             CharacterClass = Kit.classOrNull("java.lang.Character"),
@@ -144,6 +171,7 @@ public class ScriptRuntime {
             ContextFactoryClass = Kit.classOrNull("org.mozilla.javascript.ContextFactory"),
             FunctionClass = Kit.classOrNull("org.mozilla.javascript.Function"),
             ScriptableObjectClass = Kit.classOrNull("org.mozilla.javascript.ScriptableObject");
+
     public static final Class<Scriptable> ScriptableClass = Scriptable.class;
 
     private static final Object LIBRARY_SCOPE_KEY = "LIBRARY_SCOPE";
@@ -166,20 +194,25 @@ public class ScriptRuntime {
             ((TopLevel) scope).clearCache();
         }
 
+        scope.put("global", scope, scope);
+
         scope.associateValue(LIBRARY_SCOPE_KEY, scope);
         new ClassCache().associate(scope);
+        new ConcurrentFactory().associate(scope);
 
-        BaseFunction.init(cx, scope, sealed);
-        NativeObject.init(scope, sealed);
+        LambdaConstructor function = BaseFunction.init(cx, scope, sealed);
+        LambdaConstructor obj = NativeObject.init(cx, scope, sealed);
 
-        Scriptable objectProto = ScriptableObject.getObjectPrototype(scope);
+        ScriptableObject objectPrototype = (ScriptableObject) obj.getPrototypeProperty();
+        ScriptableObject functionPrototype = (ScriptableObject) function.getPrototypeProperty();
 
-        // Function.prototype.__proto__ should be Object.prototype
-        Scriptable functionProto = ScriptableObject.getClassPrototype(scope, "Function");
-        functionProto.setPrototype(objectProto);
+        objectPrototype.setPrototype(null);
+        functionPrototype.setPrototype(objectPrototype);
+        function.setPrototype(functionPrototype);
+        obj.setPrototype(functionPrototype);
 
         // Set the prototype of the object passed in if need be
-        if (scope.getPrototype() == null) scope.setPrototype(objectProto);
+        if (scope.getPrototype() == null) scope.setPrototype(objectPrototype);
 
         // must precede NativeGlobal since it's needed therein
         NativeError.init(scope, sealed);
@@ -236,6 +269,8 @@ public class ScriptRuntime {
             new LazilyLoadedCtor(scope, "Uint16Array", sealed, true, NativeUint16Array::init);
             new LazilyLoadedCtor(scope, "Int32Array", sealed, true, NativeInt32Array::init);
             new LazilyLoadedCtor(scope, "Uint32Array", sealed, true, NativeUint32Array::init);
+            new LazilyLoadedCtor(scope, "BigInt64Array", sealed, true, NativeBigInt64Array::init);
+            new LazilyLoadedCtor(scope, "BigUint64Array", sealed, true, NativeBigUint64Array::init);
             new LazilyLoadedCtor(scope, "Float32Array", sealed, true, NativeFloat32Array::init);
             new LazilyLoadedCtor(scope, "Float64Array", sealed, true, NativeFloat64Array::init);
             new LazilyLoadedCtor(scope, "DataView", sealed, true, NativeDataView::init);
@@ -292,7 +327,7 @@ public class ScriptRuntime {
 
     static String[] getTopPackageNames() {
         // Include "android" top package if running on Android
-        return "Dalvik".equals(System.getProperty("java.vm.name"))
+        return androidApi > 0
                 ? new String[] {"java", "javax", "org", "com", "edu", "net", "android"}
                 : new String[] {"java", "javax", "org", "com", "edu", "net"};
     }
@@ -842,12 +877,12 @@ public class ScriptRuntime {
         }
         double integerIndex = toInteger(val);
         if (integerIndex < 0) {
-            throw rangeError("index out of range");
+            throw rangeErrorById("msg.out.of.range.index", integerIndex);
         }
         // ToLength
         double index = Math.min(integerIndex, NativeNumber.MAX_SAFE_INTEGER);
         if (integerIndex != index) {
-            throw rangeError("index out of range");
+            throw rangeErrorById("msg.out.of.range.index", integerIndex);
         }
         return (int) index;
     }
@@ -1068,27 +1103,20 @@ public class ScriptRuntime {
     }
 
     public static String numberToString(double d, int base) {
+        if (base == 10) {
+            // Common case: DoubleFormatter efficiently identifies non-finite
+            // numbers. Do this before other checks.
+            return DoubleFormatter.toString(d);
+        }
+
         if ((base < 2) || (base > 36)) {
             throw ScriptRuntime.rangeErrorById("msg.bad.radix", Integer.toString(base));
         }
-
         if (Double.isNaN(d)) return "NaN";
         if (d == Double.POSITIVE_INFINITY) return "Infinity";
         if (d == Double.NEGATIVE_INFINITY) return "-Infinity";
         if (d == 0.0) return "0";
-
-        if (base != 10) {
-            return DToA.JS_dtobasestr(base, d);
-        }
-        // V8 FastDtoa can't convert all numbers, so try it first but
-        // fall back to old DToA in case it fails
-        String result = FastDtoa.numberToString(d);
-        if (result != null) {
-            return result;
-        }
-        StringBuilder buffer = new StringBuilder();
-        DToA.JS_dtostr(buffer, DToA.DTOSTR_STANDARD, 0, d);
-        return buffer.toString();
+        return DToA.JS_dtobasestr(base, d);
     }
 
     public static String bigIntToString(BigInteger n, int base) {
@@ -1266,15 +1294,8 @@ public class ScriptRuntime {
             throw typeErrorById("msg.undef.to.object");
         }
 
-        if (isSymbol(val)) {
-            if (val instanceof SymbolKey) {
-                NativeSymbol result =
-                        new NativeSymbol((SymbolKey) val, NativeSymbol.SymbolKind.REGULAR);
-                setBuiltinProtoAndParent(result, scope, TopLevel.Builtins.Symbol);
-                return result;
-            }
-
-            NativeSymbol result = new NativeSymbol((NativeSymbol) val);
+        if (val instanceof SymbolKey) {
+            NativeSymbol result = new NativeSymbol((SymbolKey) val);
             setBuiltinProtoAndParent(result, scope, TopLevel.Builtins.Symbol);
             return result;
         }
@@ -1309,7 +1330,7 @@ public class ScriptRuntime {
         }
 
         // Extension: Wrap as a LiveConnect object.
-        Object wrapped = cx.getWrapFactory().wrap(cx, scope, val, null);
+        Object wrapped = cx.getWrapFactory().wrap(cx, scope, val, TypeInfo.NONE);
         if (wrapped instanceof Scriptable) return (Scriptable) wrapped;
         throw errorWithClassName("msg.invalid.type", val);
     }
@@ -1415,12 +1436,25 @@ public class ScriptRuntime {
         return toInt32(toNumber(val));
     }
 
+    // We return a double here because we *must* maintain infinities
+    // for the purposes of error reporting.
+    public static double toIntegerOrInfinity(Object val) {
+        // short circuit for common integer values
+        if (val instanceof Integer) return ((Integer) val).doubleValue();
+
+        return toIntegerOrInfinity(toNumber(val));
+    }
+
     public static int toInt32(Object[] args, int index) {
         return (index < args.length) ? toInt32(args[index]) : 0;
     }
 
     public static int toInt32(double d) {
         return DoubleConversion.doubleToInt32(d);
+    }
+
+    public static double toIntegerOrInfinity(double d) {
+        return DoubleConversion.truncate(d);
     }
 
     /**
@@ -1465,7 +1499,7 @@ public class ScriptRuntime {
 
     /** Implements the abstract operation AdvanceStringIndex. See ECMAScript spec 22.2.7.3 */
     public static long advanceStringIndex(String string, long index, boolean unicode) {
-        if (index >= NativeNumber.MAX_SAFE_INTEGER) Kit.codeBug();
+        if (index > NativeNumber.MAX_SAFE_INTEGER) Kit.codeBug();
         if (!unicode) {
             return index + 1;
         }
@@ -1943,6 +1977,7 @@ public class ScriptRuntime {
     /** Call obj.[[Put]](id, value) */
     public static Object setObjectElem(
             Object obj, Object elem, Object value, Context cx, Scriptable scope) {
+        verifyIsScriptableOrComplainWriteErrorInEs5Strict(obj, elem, value, cx);
         Scriptable sobj = asScriptableOrThrowUndefWriteError(cx, scope, obj, elem, value);
         return setObjectElem(sobj, elem, value, cx);
     }
@@ -2066,6 +2101,7 @@ public class ScriptRuntime {
     /** A cheaper and less general version of the above for well-known argument types. */
     public static Object setObjectIndex(
             Object obj, double dblIndex, Object value, Context cx, Scriptable scope) {
+        verifyIsScriptableOrComplainWriteErrorInEs5Strict(obj, dblIndex, value, cx);
         Scriptable sobj = asScriptableOrThrowUndefWriteError(cx, scope, obj, dblIndex, value);
         int index = (int) dblIndex;
         if (index == dblIndex && index >= 0) {
@@ -2165,7 +2201,7 @@ public class ScriptRuntime {
     }
 
     static boolean isSpecialProperty(String s) {
-        return s.equals("__proto__") || s.equals("__parent__");
+        return s.equals(NativeObject.PROTO_PROPERTY) || s.equals(NativeObject.PARENT_PROPERTY);
     }
 
     /**
@@ -2340,6 +2376,81 @@ public class ScriptRuntime {
         return result;
     }
 
+    private static LookupResult nameOrFunction(
+            Context cx,
+            Scriptable scope,
+            Scriptable parentScope,
+            String name,
+            boolean isOptionalChainingCall) {
+        Object result;
+        Scriptable thisObj = scope;
+
+        XMLObject firstXMLObject = null;
+        for (; ; ) {
+            if (scope instanceof NativeWith) {
+                Scriptable withObj = scope.getPrototype();
+                if (withObj instanceof XMLObject) {
+                    XMLObject xmlObj = (XMLObject) withObj;
+                    if (xmlObj.has(name, xmlObj)) {
+                        // function this should be the target object of with
+                        thisObj = xmlObj;
+                        result = xmlObj.get(name, xmlObj);
+                        break;
+                    }
+                    if (firstXMLObject == null) {
+                        firstXMLObject = xmlObj;
+                    }
+                } else {
+                    result = ScriptableObject.getProperty(withObj, name);
+                    if (result != Scriptable.NOT_FOUND) {
+                        // function this should be the target object of with
+                        thisObj = withObj;
+                        break;
+                    }
+                }
+            } else if (scope instanceof NativeCall) {
+                // NativeCall does not prototype chain and Scriptable.get
+                // can be called directly.
+                result = scope.get(name, scope);
+                if (result != Scriptable.NOT_FOUND) {
+                    // ECMA 262 requires that this for nested funtions
+                    // should be top scope
+                    thisObj = ScriptableObject.getTopLevelScope(parentScope);
+                    break;
+                }
+            } else {
+                // Can happen if Rhino embedding decided that nested
+                // scopes are useful for what ever reasons.
+                result = ScriptableObject.getProperty(scope, name);
+                if (result != Scriptable.NOT_FOUND) {
+                    thisObj = scope;
+                    break;
+                }
+            }
+            scope = parentScope;
+            parentScope = parentScope.getParentScope();
+            if (parentScope == null) {
+                result = topScopeName(cx, scope, name);
+                if (result == Scriptable.NOT_FOUND) {
+                    throw notFoundError(scope, name);
+                }
+                // For top scope thisObj for functions is always scope itself.
+                thisObj = scope;
+                break;
+            }
+        }
+
+        if (!(result instanceof Callable)) {
+            if (isOptionalChainingCall
+                    && (result == Scriptable.NOT_FOUND
+                            || result == null
+                            || Undefined.isUndefined(result))) {
+                return null;
+            }
+        }
+        return new LookupResult(result, thisObj, name);
+    }
+
     private static Object topScopeName(Context cx, Scriptable scope, String name) {
         if (cx.useDynamicScope) {
             scope = checkDynamicScope(cx.topCallScope, scope);
@@ -2488,16 +2599,15 @@ public class ScriptRuntime {
         Scriptable iterator;
     }
 
-    public static Scriptable toIterator(
-            Context cx, Scriptable scope, Scriptable obj, boolean keyOnly) {
+    public static Scriptable toIterator(Context cx, Scriptable obj, boolean keyOnly) {
         if (ScriptableObject.hasProperty(obj, NativeIterator.ITERATOR_PROPERTY_NAME)) {
             Object v = ScriptableObject.getProperty(obj, NativeIterator.ITERATOR_PROPERTY_NAME);
-            if (!(v instanceof Callable)) {
+            if (!(v instanceof Function)) {
                 throw typeErrorById("msg.invalid.iterator");
             }
-            Callable f = (Callable) v;
+            Function f = (Function) v;
             Object[] args = new Object[] {keyOnly ? Boolean.TRUE : Boolean.FALSE};
-            v = f.call(cx, scope, obj, args);
+            v = f.call(cx, f.getDeclarationScope(), obj, args);
             if (!(v instanceof Scriptable)) {
                 throw typeErrorById("msg.iterator.primitive");
             }
@@ -2551,12 +2661,7 @@ public class ScriptRuntime {
         if (enumType != ENUMERATE_KEYS_NO_ITERATOR
                 && enumType != ENUMERATE_VALUES_NO_ITERATOR
                 && enumType != ENUMERATE_ARRAY_NO_ITERATOR) {
-            x.iterator =
-                    toIterator(
-                            cx,
-                            x.obj.getParentScope(),
-                            x.obj,
-                            enumType == ScriptRuntime.ENUMERATE_KEYS);
+            x.iterator = toIterator(cx, x.obj, enumType == ScriptRuntime.ENUMERATE_KEYS);
         }
         if (x.iterator == null) {
             // enumInit should read all initial ids before returning
@@ -2578,8 +2683,13 @@ public class ScriptRuntime {
             throw typeErrorById("msg.not.iterable", toString(x.obj));
         }
         Callable f = (Callable) iterator;
-        Scriptable scope = x.obj.getParentScope();
         Object[] args = new Object[] {};
+        Scriptable scope;
+        if (f instanceof Function) {
+            scope = ((Function) f).getDeclarationScope();
+        } else {
+            scope = cx.topCallScope;
+        }
         Object v = f.call(cx, scope, x.obj, args);
         if (!(v instanceof Scriptable)) {
             throw typeErrorById("msg.not.iterable", toString(x.obj));
@@ -2609,8 +2719,14 @@ public class ScriptRuntime {
             Object v = ScriptableObject.getProperty(x.iterator, "next");
             if (!(v instanceof Callable)) return Boolean.FALSE;
             Callable f = (Callable) v;
+            Scriptable scope;
+            if (f instanceof Function) {
+                scope = ((Function) f).getDeclarationScope();
+            } else {
+                scope = cx.topCallScope;
+            }
             try {
-                x.currentId = f.call(cx, x.iterator.getParentScope(), x.iterator, emptyArgs);
+                x.currentId = f.call(cx, scope, x.iterator, emptyArgs);
                 return Boolean.TRUE;
             } catch (JavaScriptException e) {
                 if (e.getValue() instanceof NativeIterator.StopIteration) {
@@ -2653,7 +2769,12 @@ public class ScriptRuntime {
             throw notFunctionError(enumObj.iterator, ES6Iterator.NEXT_METHOD);
         }
         Callable f = (Callable) v;
-        Scriptable scope = enumObj.iterator.getParentScope();
+        Scriptable scope;
+        if (f instanceof Function) {
+            scope = ((Function) f).getDeclarationScope();
+        } else {
+            scope = cx.topCallScope;
+        }
         Object r = f.call(cx, scope, enumObj.iterator, emptyArgs);
         Scriptable iteratorResult = toObject(cx, scope, r);
         Object done = ScriptableObject.getProperty(iteratorResult, ES6Iterator.DONE_PROPERTY);
@@ -2776,11 +2897,18 @@ public class ScriptRuntime {
      * Prepare for calling name(...): return function corresponding to name and make current top
      * scope available as ScriptRuntime.lastStoredScriptable() for consumption as thisObj. The
      * caller must call ScriptRuntime.lastStoredScriptable() immediately after calling this method.
+     *
+     * @deprecated use {@link #getNameAndThis(String, Context, Scriptable)}
      */
+    @Deprecated(since = "1.8.1", forRemoval = true)
     public static Callable getNameFunctionAndThis(String name, Context cx, Scriptable scope) {
         return getNameFunctionAndThisInner(name, cx, scope, false);
     }
 
+    /**
+     * @deprecated use {@link #getNameAndThisOptional(String, Context, Scriptable)}
+     */
+    @Deprecated(since = "1.8.1", forRemoval = true)
     public static Callable getNameFunctionAndThisOptional(
             String name, Context cx, Scriptable scope) {
         return getNameFunctionAndThisInner(name, cx, scope, true);
@@ -2815,6 +2943,45 @@ public class ScriptRuntime {
     }
 
     /**
+     * Prepare for calling name(...): return function corresponding to name and make current top
+     * scope available as part of the result.
+     */
+    public static LookupResult getNameAndThis(String name, Context cx, Scriptable scope) {
+        return getNameAndThisInner(name, cx, scope, false);
+    }
+
+    public static LookupResult getNameAndThisOptional(String name, Context cx, Scriptable scope) {
+        return getNameAndThisInner(name, cx, scope, true);
+    }
+
+    private static LookupResult getNameAndThisInner(
+            String name, Context cx, Scriptable scope, boolean isOptionalChainingCall) {
+        Scriptable parent = scope.getParentScope();
+        if (parent == null) {
+            Object result = topScopeName(cx, scope, name);
+            if (!(result instanceof Callable)) {
+                if (isOptionalChainingCall
+                        && (result == Scriptable.NOT_FOUND
+                                || result == null
+                                || Undefined.isUndefined(result))) {
+                    // Returning null here indicates to both runtimes that
+                    // we are doing optional chaining.
+                    return null;
+                }
+
+                if (result == Scriptable.NOT_FOUND) {
+                    throw notFoundError(scope, name);
+                }
+            }
+            // Top scope is not NativeWith or NativeCall => thisObj == scope
+            return new LookupResult(result, scope, name);
+        }
+
+        // name will call storeScriptable(cx, thisObj);
+        return nameOrFunction(cx, scope, parent, name, isOptionalChainingCall);
+    }
+
+    /**
      * Prepare for calling obj[id](...): return function corresponding to obj[id] and make obj
      * properly converted to Scriptable available as ScriptRuntime.lastStoredScriptable() for
      * consumption as thisObj. The caller must call ScriptRuntime.lastStoredScriptable() immediately
@@ -2832,12 +2999,19 @@ public class ScriptRuntime {
      * properly converted to Scriptable available as ScriptRuntime.lastStoredScriptable() for
      * consumption as thisObj. The caller must call ScriptRuntime.lastStoredScriptable() immediately
      * after calling this method.
+     *
+     * @deprecated use {@link #getElemAndThis(Object, Object, Context, Scriptable)}
      */
+    @Deprecated(since = "1.8.1", forRemoval = true)
     public static Callable getElemFunctionAndThis(
             Object obj, Object elem, Context cx, Scriptable scope) {
         return getElemFunctionAndThisInner(obj, elem, cx, scope, false);
     }
 
+    /**
+     * @deprecated use {@link #getElemAndThisOptional(Object, Object, Context, Scriptable)}
+     */
+    @Deprecated(since = "1.8.1", forRemoval = true)
     public static Callable getElemFunctionAndThisOptional(
             Object obj, Object elem, Context cx, Scriptable scope) {
         return getElemFunctionAndThisInner(obj, elem, cx, scope, true);
@@ -2885,6 +3059,58 @@ public class ScriptRuntime {
     }
 
     /**
+     * Prepare for calling obj[id](...): return function corresponding to obj[id] and make obj
+     * properly converted to Scriptable available in the result.
+     */
+    public static LookupResult getElemAndThis(
+            Object obj, Object elem, Context cx, Scriptable scope) {
+        return getElemAndThisInner(obj, elem, cx, scope, false);
+    }
+
+    public static LookupResult getElemAndThisOptional(
+            Object obj, Object elem, Context cx, Scriptable scope) {
+        return getElemAndThisInner(obj, elem, cx, scope, true);
+    }
+
+    private static LookupResult getElemAndThisInner(
+            Object obj, Object elem, Context cx, Scriptable scope, boolean isOptionalChainingCall) {
+        Scriptable thisObj;
+        Object value;
+
+        if (isSymbol(elem)) {
+            thisObj = toObjectOrNull(cx, obj, scope);
+            if (thisObj == null) {
+                throw undefCallError(obj, String.valueOf(elem));
+            }
+            value = ScriptableObject.getProperty(thisObj, (Symbol) elem);
+
+        } else {
+            StringIdOrIndex s = toStringIdOrIndex(elem);
+            if (s.stringId != null) {
+                return getPropAndThis(obj, s.stringId, cx, scope);
+            }
+
+            thisObj = toObjectOrNull(cx, obj, scope);
+            if (thisObj == null) {
+                throw undefCallError(obj, String.valueOf(elem));
+            }
+
+            value = ScriptableObject.getProperty(thisObj, s.index);
+        }
+
+        if (!(value instanceof Callable)) {
+            if (isOptionalChainingCall
+                    && (value == Scriptable.NOT_FOUND
+                            || value == null
+                            || Undefined.isUndefined(value))) {
+                return null;
+            }
+        }
+
+        return new LookupResult(value, thisObj, elem.toString());
+    }
+
+    /**
      * Prepare for calling obj.property(...): return function corresponding to obj.property and make
      * obj properly converted to Scriptable available as ScriptRuntime.lastStoredScriptable() for
      * consumption as thisObj. The caller must call ScriptRuntime.lastStoredScriptable() immediately
@@ -2903,12 +3129,19 @@ public class ScriptRuntime {
      * obj properly converted to Scriptable available as ScriptRuntime.lastStoredScriptable() for
      * consumption as thisObj. The caller must call ScriptRuntime.lastStoredScriptable() immediately
      * after calling this method.
+     *
+     * @deprecated Use {@link #getPropAndThis(Object, String, Context, Scriptable)} instead
      */
+    @Deprecated(since = "1.8.1", forRemoval = true)
     public static Callable getPropFunctionAndThis(
             Object obj, String property, Context cx, Scriptable scope) {
         return getPropFunctionAndThisInner(obj, property, cx, scope, false);
     }
 
+    /**
+     * @deprecated Use {@link #getPropAndThis(Object, String, Context, Scriptable)} instead
+     */
+    @Deprecated(since = "1.8.1", forRemoval = true)
     public static Callable getPropFunctionAndThisOptional(
             Object obj, String property, Context cx, Scriptable scope) {
         return getPropFunctionAndThisInner(obj, property, cx, scope, true);
@@ -2961,15 +3194,76 @@ public class ScriptRuntime {
     }
 
     /**
+     * Prepare for calling obj.property(...): return function corresponding to obj.property and make
+     * obj properly converted to Scriptable in the result.
+     */
+    public static LookupResult getPropAndThis(
+            Object obj, String property, Context cx, Scriptable scope) {
+        return getPropAndThisInner(obj, property, cx, scope, false);
+    }
+
+    public static LookupResult getPropAndThisOptional(
+            Object obj, String property, Context cx, Scriptable scope) {
+        return getPropAndThisInner(obj, property, cx, scope, true);
+    }
+
+    private static LookupResult getPropAndThisInner(
+            Object obj,
+            String property,
+            Context cx,
+            Scriptable scope,
+            boolean isOptionalChainingCall) {
+        Scriptable thisObj = toObjectOrNull(cx, obj, scope);
+        return getPropAndThisHelper(obj, property, cx, thisObj, isOptionalChainingCall);
+    }
+
+    private static LookupResult getPropAndThisHelper(
+            Object obj,
+            String property,
+            Context cx,
+            Scriptable thisObj,
+            boolean isOptionalChainingCall) {
+        if (thisObj == null) {
+            if (isOptionalChainingCall) {
+                return null;
+            }
+            throw undefCallError(obj, property);
+        }
+
+        Object value = ScriptableObject.getProperty(thisObj, property);
+        if (value == ScriptableObject.NOT_FOUND) {
+            Object noSuchMethod = ScriptableObject.getProperty(thisObj, "__noSuchMethod__");
+            if (noSuchMethod instanceof Callable)
+                value = new NoSuchMethodShim((Callable) noSuchMethod, property);
+        }
+
+        if (!(value instanceof Callable)
+                && isOptionalChainingCall
+                && (value == Scriptable.NOT_FOUND
+                        || value == null
+                        || Undefined.isUndefined(value))) {
+            return null;
+        }
+        return new LookupResult(value, thisObj, property);
+    }
+
+    /**
      * Prepare for calling &lt;expression&gt;(...): return function corresponding to
      * &lt;expression&gt; and make parent scope of the function available as
      * ScriptRuntime.lastStoredScriptable() for consumption as thisObj. The caller must call
      * ScriptRuntime.lastStoredScriptable() immediately after calling this method.
+     *
+     * @deprecated Use {@link #getValueAndThis(Object, Context)} instead
      */
+    @Deprecated
     public static Callable getValueFunctionAndThis(Object value, Context cx) {
         return getValueFunctionAndThisInner(value, cx, false);
     }
 
+    /**
+     * @deprecated Use {@link #getValueAndThisOptional(Object, Context)} instead
+     */
+    @Deprecated(since = "1.8.1", forRemoval = true)
     public static Callable getValueFunctionAndThisOptional(Object value, Context cx) {
         return getValueFunctionAndThisInner(value, cx, true);
     }
@@ -2989,24 +3283,59 @@ public class ScriptRuntime {
 
         Callable f = (Callable) value;
         Scriptable thisObj = null;
-        if (f instanceof Scriptable) {
-            thisObj = ((Scriptable) f).getParentScope();
+        if (f instanceof Function) {
+            thisObj = ((Function) f).getDeclarationScope();
         }
         if (thisObj == null) {
             if (cx.topCallScope == null) throw new IllegalStateException();
             thisObj = cx.topCallScope;
         }
-        if (thisObj.getParentScope() != null) {
-            if (thisObj instanceof NativeWith) {
-                // functions defined inside with should have with target
-                // as their thisObj
-            } else if (thisObj instanceof NativeCall) {
-                // nested functions should have top scope as their thisObj
-                thisObj = ScriptableObject.getTopLevelScope(thisObj);
-            }
+        if (thisObj instanceof NativeCall) {
+            // nested functions should have top scope as their thisObj
+            thisObj = ScriptableObject.getTopLevelScope(thisObj);
         }
         storeScriptable(cx, thisObj);
         return f;
+    }
+
+    /**
+     * Prepare for calling &lt;expression&gt;(...): return function corresponding to
+     * &lt;expression&gt; and make parent scope of the function available in the result.
+     */
+    public static LookupResult getValueAndThis(Object value, Context cx) {
+        return getValueAndThisInner(value, cx, false);
+    }
+
+    public static LookupResult getValueAndThisOptional(Object value, Context cx) {
+        return getValueAndThisInner(value, cx, true);
+    }
+
+    private static LookupResult getValueAndThisInner(
+            Object value, Context cx, boolean isOptionalChainingCall) {
+        if (!(value instanceof Callable)) {
+            if (isOptionalChainingCall
+                    && (value == Scriptable.NOT_FOUND
+                            || value == null
+                            || Undefined.isUndefined(value))) {
+                return null;
+            }
+            return new LookupResult(value, null, value);
+        }
+
+        Callable f = (Callable) value;
+        Scriptable thisObj = null;
+        if (f instanceof Function) {
+            thisObj = ((Function) f).getDeclarationScope();
+        }
+        if (thisObj == null) {
+            if (cx.topCallScope == null) throw new IllegalStateException();
+            thisObj = cx.topCallScope;
+        }
+        if (thisObj instanceof NativeCall) {
+            // nested functions should have top scope as their thisObj
+            thisObj = ScriptableObject.getTopLevelScope(thisObj);
+        }
+        return new LookupResult(f, thisObj, value);
     }
 
     /**
@@ -3035,9 +3364,8 @@ public class ScriptRuntime {
     /**
      * Perform function call in reference context. Should always return value that can be passed to
      * {@link #refGet(Ref, Context)} or {@link #refSet(Ref, Object, Context)} arbitrary number of
-     * times. The args array reference should not be stored in any object that is can be
-     * GC-reachable after this method returns. If this is necessary, store args.clone(), not args
-     * array itself.
+     * times. The args array reference should not be stored in any object that can be GC-reachable
+     * after this method returns. If this is necessary, store args.clone(), not args array itself.
      */
     public static Ref callRef(Callable function, Scriptable thisObj, Object[] args, Context cx) {
         if (function instanceof RefCallable) {
@@ -3135,7 +3463,7 @@ public class ScriptRuntime {
         int L = args.length;
         Callable function = getCallable(thisObj);
 
-        Scriptable callThis = getApplyOrCallThis(cx, scope, L == 0 ? null : args[0], L);
+        Scriptable callThis = getApplyOrCallThis(cx, scope, L == 0 ? null : args[0], L, function);
 
         Object[] callArgs;
         if (isApply) {
@@ -3154,22 +3482,41 @@ public class ScriptRuntime {
         return function.call(cx, scope, callThis, callArgs);
     }
 
-    static Scriptable getApplyOrCallThis(Context cx, Scriptable scope, Object arg0, int l) {
+    public static Scriptable getApplyOrCallThis(
+            Context cx, Scriptable scope, Object arg0, int l, Callable target) {
         Scriptable callThis;
-        if (l != 0) {
-            callThis =
-                    arg0 == Undefined.instance
-                                    && !cx.hasFeature(Context.FEATURE_OLD_UNDEF_NULL_THIS)
-                            ? Undefined.SCRIPTABLE_UNDEFINED
-                            : toObjectOrNull(cx, arg0, scope);
+        if (cx.hasFeature(Context.FEATURE_OLD_UNDEF_NULL_THIS)) {
+            // Legacy behavior
+            if (l != 0) {
+                callThis = toObjectOrNull(cx, arg0, scope);
+            } else {
+                callThis = null;
+            }
+            if (callThis == null) {
+                // This covers the case of args[0] == (null|undefined) as well.
+                callThis = getTopCallScope(cx);
+            }
         } else {
-            callThis = null;
+            // Spec-compliant behavior
+            if (l != 0) {
+                callThis =
+                        arg0 == Undefined.instance
+                                ? Undefined.SCRIPTABLE_UNDEFINED
+                                : toObjectOrNull(cx, arg0, scope);
+            } else {
+                callThis = Undefined.SCRIPTABLE_UNDEFINED;
+            }
+
+            // Replace missing this with global object only for non-strict functions
+            boolean missingCallThis =
+                    callThis == null || callThis == Undefined.SCRIPTABLE_UNDEFINED;
+            boolean isFunctionStrict =
+                    !(target instanceof JSFunction) || ((JSFunction) target).isStrict();
+            if (missingCallThis && !isFunctionStrict) {
+                callThis = getTopCallScope(cx);
+            }
         }
-        if (callThis == null && cx.hasFeature(Context.FEATURE_OLD_UNDEF_NULL_THIS)) {
-            callThis =
-                    getTopCallScope(
-                            cx); // This covers the case of args[0] == (null|undefined) as well.
-        }
+
         return callThis;
     }
 
@@ -3253,10 +3600,15 @@ public class ScriptRuntime {
             throw new JavaScriptException("Interpreter not present", filename, lineNumber);
         }
 
+        var homeObject = scope instanceof NativeCall ? ((NativeCall) scope).getHomeObject() : null;
+
         // Compile with explicit interpreter instance to force interpreter
         // mode.
         Consumer<CompilerEnvirons> compilerEnvironsProcessor =
                 compilerEnvs -> {
+                    // `eval` propagates strict mode
+                    compilerEnvs.setStrictMode(cx.isStrictMode());
+
                     // If we are inside a method, we need to allow super. Methods have the home
                     // object set and propagated via the activation (i.e. the NativeCall),
                     // but non-methods will have the home object set to null.
@@ -3264,7 +3616,10 @@ public class ScriptRuntime {
                             scope instanceof NativeCall
                                     && ((NativeCall) scope).getHomeObject() != null;
                     compilerEnvs.setAllowSuper(isInsideMethod);
+                    compilerEnvs.setInEval(true);
+                    compilerEnvs.setHomeObject(homeObject);
                 };
+
         Script script =
                 cx.compileString(
                         x.toString(),
@@ -3274,13 +3629,11 @@ public class ScriptRuntime {
                         1,
                         null,
                         compilerEnvironsProcessor);
-        evaluator.setEvalScriptFlag(script);
-        Callable c = (Callable) script;
         Scriptable thisObject =
                 thisArg == Undefined.instance
                         ? Undefined.SCRIPTABLE_UNDEFINED
                         : (Scriptable) thisArg;
-        return c.call(cx, scope, thisObject, ScriptRuntime.emptyArgs);
+        return script.exec(cx, scope, thisObject);
     }
 
     /** The typeof operator */
@@ -3394,9 +3747,9 @@ public class ScriptRuntime {
     }
 
     /**
-     * https://262.ecma-international.org/11.0/#sec-addition-operator-plus 5. Let lprim be ?
-     * ToPrimitive(lval). 7. If Type(lprim) is String or Type(rprim) is String, then a. Let lstr be
-     * ? ToString(lprim).
+     * <a href="https://262.ecma-international.org/11.0/#sec-addition-operator-plus">12.8.3 The
+     * Addition Operator (+)</a> 5. Let lprim be ? ToPrimitive(lval). 7. If Type(lprim) is String or
+     * Type(rprim) is String, then a. Let lstr be ? ToString(lprim).
      *
      * <p>Should call toPrimitive before toCharSequence
      *
@@ -3408,9 +3761,9 @@ public class ScriptRuntime {
     }
 
     /**
-     * https://262.ecma-international.org/11.0/#sec-addition-operator-plus 6. Let rprim be ?
-     * ToPrimitive(rval). 7. If Type(lprim) is String or Type(rprim) is String, then b. Let rstr be
-     * ? ToString(rprim).
+     * <a href="https://262.ecma-international.org/11.0/#sec-addition-operator-plus">12.8.3 The
+     * Addition Operator (+)</a> 6. Let rprim be ? ToPrimitive(rval). 7. If Type(lprim) is String or
+     * Type(rprim) is String, then b. Let rstr be ? ToString(rprim).
      *
      * <p>Should call toPrimitive before toCharSequence
      *
@@ -3520,6 +3873,8 @@ public class ScriptRuntime {
     }
 
     @SuppressWarnings("AndroidJdkLibsChecker")
+    // java.math.BigInteger#intValueExact() available in API-level 31
+    // https://developer.android.com/reference/java/math/BigInteger#intValueExact()
     public static Number exponentiate(Number val1, Number val2) {
         if (val1 instanceof BigInteger && val2 instanceof BigInteger) {
             if (((BigInteger) val2).signum() == -1) {
@@ -3540,6 +3895,10 @@ public class ScriptRuntime {
         }
     }
 
+    public static double bitwiseAND(double val1, double val2) {
+        return (double) (toInt32(val1) & toInt32(val2));
+    }
+
     public static Number bitwiseAND(Number val1, Number val2) {
         if (val1 instanceof BigInteger && val2 instanceof BigInteger) {
             return ((BigInteger) val1).and((BigInteger) val2);
@@ -3553,6 +3912,10 @@ public class ScriptRuntime {
         }
     }
 
+    public static double bitwiseOR(double val1, double val2) {
+        return (double) (toInt32(val1) | toInt32(val2));
+    }
+
     public static Number bitwiseOR(Number val1, Number val2) {
         if (val1 instanceof BigInteger && val2 instanceof BigInteger) {
             return ((BigInteger) val1).or((BigInteger) val2);
@@ -3564,6 +3927,10 @@ public class ScriptRuntime {
             int result = toInt32(val1.doubleValue()) | toInt32(val2.doubleValue());
             return Double.valueOf(result);
         }
+    }
+
+    public static double bitwiseXOR(double val1, double val2) {
+        return (double) (toInt32(val1) ^ toInt32(val2));
     }
 
     public static Number bitwiseXOR(Number val1, Number val2) {
@@ -3581,7 +3948,13 @@ public class ScriptRuntime {
         }
     }
 
+    public static double leftShift(double val1, double val2) {
+        return (double) (toInt32(val1) << toInt32(val2));
+    }
+
     @SuppressWarnings("AndroidJdkLibsChecker")
+    // java.math.BigInteger#intValueExact() available in API-level 31
+    // https://developer.android.com/reference/java/math/BigInteger#intValueExact()
     public static Number leftShift(Number val1, Number val2) {
         if (val1 instanceof BigInteger && val2 instanceof BigInteger) {
             try {
@@ -3601,7 +3974,13 @@ public class ScriptRuntime {
         }
     }
 
+    public static double signedRightShift(double val1, double val2) {
+        return (double) (toInt32(val1) >> toInt32(val2));
+    }
+
     @SuppressWarnings("AndroidJdkLibsChecker")
+    // java.math.BigInteger#intValueExact() available in API-level 31
+    // https://developer.android.com/reference/java/math/BigInteger#intValueExact()
     public static Number signedRightShift(Number val1, Number val2) {
         if (val1 instanceof BigInteger && val2 instanceof BigInteger) {
             try {
@@ -3917,7 +4296,7 @@ public class ScriptRuntime {
         if (exoticToPrim instanceof Function) {
             final Function func = (Function) exoticToPrim;
             final Context cx = Context.getCurrentContext();
-            final Scriptable scope = func.getParentScope();
+            final Scriptable scope = func.getDeclarationScope();
             final String hint;
             if (preferredType == null) {
                 hint = "default";
@@ -4486,7 +4865,7 @@ public class ScriptRuntime {
         }
     }
 
-    private static boolean compareTo(double d1, double d2, int op) {
+    static boolean compareTo(double d1, double d2, int op) {
         switch (op) {
             case Token.GE:
                 return d1 >= d2;
@@ -4545,6 +4924,12 @@ public class ScriptRuntime {
         return doTopCall(callable, cx, scope, thisObj, args, cx.isTopLevelStrict);
     }
 
+    @Deprecated
+    public static Object doTopCall(
+            Script script, Context cx, Scriptable scope, Scriptable thisObj) {
+        return doTopCall(script, cx, scope, thisObj, cx.isTopLevelStrict);
+    }
+
     public static Object doTopCall(
             Callable callable,
             Context cx,
@@ -4575,10 +4960,39 @@ public class ScriptRuntime {
         return result;
     }
 
+    public static Object doTopCall(
+            Script script,
+            Context cx,
+            Scriptable scope,
+            Scriptable thisObj,
+            boolean isTopLevelStrict) {
+        if (scope == null) throw new IllegalArgumentException();
+        if (cx.topCallScope != null) throw new IllegalStateException();
+
+        Object result;
+        cx.topCallScope = ScriptableObject.getTopLevelScope(scope);
+        cx.useDynamicScope = cx.hasFeature(Context.FEATURE_DYNAMIC_SCOPE);
+        boolean previousTopLevelStrict = cx.isTopLevelStrict;
+        cx.isTopLevelStrict = isTopLevelStrict;
+        ContextFactory f = cx.getFactory();
+        try {
+            result = f.doTopCall(script, cx, scope, thisObj);
+        } finally {
+            cx.topCallScope = null;
+            // Cleanup cached references
+            cx.cachedXMLLib = null;
+            cx.isTopLevelStrict = previousTopLevelStrict;
+            // Function should always call exitActivationFunction
+            // if it creates activation record
+            assert (cx.currentActivationCall == null);
+        }
+        return result;
+    }
+
     /**
-     * Return <code>possibleDynamicScope</code> if <code>staticTopScope</code> is present on its
-     * prototype chain and return <code>staticTopScope</code> otherwise. Should only be called when
-     * <code>staticTopScope</code> is top scope.
+     * Return {@code possibleDynamicScope} if {@code staticTopScope} is present on its prototype
+     * chain and return {@code staticTopScope} otherwise. Should only be called when {@code
+     * staticTopScope} is top scope.
      */
     static Scriptable checkDynamicScope(
             Scriptable possibleDynamicScope, Scriptable staticTopScope) {
@@ -4607,14 +5021,16 @@ public class ScriptRuntime {
     }
 
     public static void initScript(
-            NativeFunction funObj,
+            ScriptOrFn execObj,
             Scriptable thisObj,
             Context cx,
             Scriptable scope,
             boolean evalScript) {
         if (cx.topCallScope == null) throw new IllegalStateException();
 
-        int varCount = funObj.getParamAndVarCount();
+        var desc = execObj.getDescriptor();
+
+        int varCount = desc.getParamAndVarCount();
         if (varCount != 0) {
 
             Scriptable varScope = scope;
@@ -4625,16 +5041,15 @@ public class ScriptRuntime {
             }
 
             for (int i = varCount; i-- != 0; ) {
-                String name = funObj.getParamOrVarName(i);
-                boolean isConst = funObj.getParamOrVarConst(i);
+                String name = desc.getParamOrVarName(i);
+                boolean isConst = desc.getParamOrVarConst(i);
                 // Don't overwrite existing def if already defined in object
                 // or prototypes of object.
                 if (!ScriptableObject.hasProperty(scope, name)) {
                     if (isConst) {
                         ScriptableObject.defineConstProperty(varScope, name);
                     } else if (!evalScript) {
-                        if (!(funObj instanceof InterpretedFunction)
-                                || ((InterpretedFunction) funObj).hasFunctionNamed(name)) {
+                        if (desc.hasFunctionNamed(name)) {
                             // Global var definitions are supposed to be DONTDELETE
                             ScriptableObject.defineProperty(
                                     varScope, name, Undefined.instance, ScriptableObject.PERMANENT);
@@ -4650,58 +5065,90 @@ public class ScriptRuntime {
     }
 
     /**
-     * @deprecated Use {@link #createFunctionActivation(NativeFunction, Context, Scriptable,
-     *     Object[], boolean, boolean, Scriptable)} instead
+     * @deprecated Use {@link #createFunctionActivation(JSFunction, Context, Scriptable, Object[],
+     *     boolean, boolean)} instead
      */
     @Deprecated
     public static Scriptable createFunctionActivation(
-            NativeFunction funObj, Scriptable scope, Object[] args) {
+            JSFunction funObj, Scriptable scope, Object[] args) {
         return createFunctionActivation(
-                funObj, Context.getCurrentContext(), scope, args, false, false, null);
+                funObj, Context.getCurrentContext(), scope, args, false, false);
     }
 
     /**
-     * @deprecated Use {@link #createFunctionActivation(NativeFunction, Context, Scriptable,
-     *     Object[], boolean, boolean, Scriptable)} instead
+     * @deprecated Use {@link #createFunctionActivation(JSFunction, Context, Scriptable, Object[],
+     *     boolean, boolean, boolean)} instead
      */
     @Deprecated
     public static Scriptable createFunctionActivation(
-            NativeFunction funObj, Scriptable scope, Object[] args, boolean isStrict) {
+            JSFunction funObj, Scriptable scope, Object[] args, boolean isStrict) {
         return new NativeCall(
-                funObj, Context.getCurrentContext(), scope, args, false, isStrict, false, null);
+                funObj, Context.getCurrentContext(), scope, args, false, isStrict, false, true);
+    }
+
+    /**
+     * @deprecated Use {@link #createFunctionActivation(JSFunction, Context, Scriptable, Object[],
+     *     boolean, boolean, boolean)} instead
+     */
+    @Deprecated
+    public static Scriptable createFunctionActivation(
+            JSFunction funObj,
+            Context cx,
+            Scriptable scope,
+            Object[] args,
+            boolean isStrict,
+            boolean argsHasRest) {
+        return new NativeCall(funObj, cx, scope, args, false, isStrict, argsHasRest, true);
     }
 
     public static Scriptable createFunctionActivation(
-            NativeFunction funObj,
+            JSFunction funObj,
             Context cx,
             Scriptable scope,
             Object[] args,
             boolean isStrict,
             boolean argsHasRest,
-            Scriptable homeObject) {
-        return new NativeCall(funObj, cx, scope, args, false, isStrict, argsHasRest, homeObject);
+            boolean requiresArgumentObject) {
+        return new NativeCall(
+                funObj, cx, scope, args, false, isStrict, argsHasRest, requiresArgumentObject);
     }
 
     /**
-     * @deprecated Use {@link #createArrowFunctionActivation(NativeFunction, Context, Scriptable,
-     *     Object[], boolean, boolean, Scriptable)} instead
+     * @deprecated Use {@link #createArrowFunctionActivation(JSFunction, Context, Scriptable,
+     *     Object[], boolean, boolean, boolean)} instead
      */
     @Deprecated
     public static Scriptable createArrowFunctionActivation(
-            NativeFunction funObj, Scriptable scope, Object[] args, boolean isStrict) {
+            JSFunction funObj, Scriptable scope, Object[] args, boolean isStrict) {
         return new NativeCall(
-                funObj, Context.getCurrentContext(), scope, args, true, isStrict, false, null);
+                funObj, Context.getCurrentContext(), scope, args, true, isStrict, false, true);
+    }
+
+    /**
+     * @deprecated Use {@link #createArrowFunctionActivation(JSFunction, Context, Scriptable,
+     *     Object[], boolean, boolean, boolean)} instead
+     */
+    @Deprecated
+    public static Scriptable createArrowFunctionActivation(
+            JSFunction funObj,
+            Context cx,
+            Scriptable scope,
+            Object[] args,
+            boolean isStrict,
+            boolean argsHasRest) {
+        return new NativeCall(funObj, cx, scope, args, true, isStrict, argsHasRest, true);
     }
 
     public static Scriptable createArrowFunctionActivation(
-            NativeFunction funObj,
+            JSFunction funObj,
             Context cx,
             Scriptable scope,
             Object[] args,
             boolean isStrict,
             boolean argsHasRest,
-            Scriptable homeObject) {
-        return new NativeCall(funObj, cx, scope, args, true, isStrict, argsHasRest, homeObject);
+            boolean requiresArgumentObject) {
+        return new NativeCall(
+                funObj, cx, scope, args, true, isStrict, argsHasRest, requiresArgumentObject);
     }
 
     public static void enterActivationFunction(Context cx, Scriptable scope) {
@@ -4709,7 +5156,6 @@ public class ScriptRuntime {
         NativeCall call = (NativeCall) scope;
         call.parentActivationCall = cx.currentActivationCall;
         cx.currentActivationCall = call;
-        call.defineAttributesForArguments();
     }
 
     public static void exitActivationFunction(Context cx) {
@@ -4813,7 +5259,7 @@ public class ScriptRuntime {
             }
 
             if (javaException != null && isVisible(cx, javaException)) {
-                Object wrap = cx.getWrapFactory().wrap(cx, scope, javaException, null);
+                Object wrap = cx.getWrapFactory().wrap(cx, scope, javaException, TypeInfo.NONE);
                 ScriptableObject.defineProperty(
                         errorObject,
                         "javaException",
@@ -4823,7 +5269,7 @@ public class ScriptRuntime {
                                 | ScriptableObject.DONTENUM);
             }
             if (isVisible(cx, re)) {
-                Object wrap = cx.getWrapFactory().wrap(cx, scope, re, null);
+                Object wrap = cx.getWrapFactory().wrap(cx, scope, re, TypeInfo.NONE);
                 ScriptableObject.defineProperty(
                         errorObject,
                         "rhinoException",
@@ -4912,7 +5358,7 @@ public class ScriptRuntime {
         }
 
         if (javaException != null && isVisible(cx, javaException)) {
-            Object wrap = cx.getWrapFactory().wrap(cx, scope, javaException, null);
+            Object wrap = cx.getWrapFactory().wrap(cx, scope, javaException, TypeInfo.NONE);
             ScriptableObject.defineProperty(
                     errorObject,
                     "javaException",
@@ -4922,7 +5368,7 @@ public class ScriptRuntime {
                             | ScriptableObject.DONTENUM);
         }
         if (isVisible(cx, re)) {
-            Object wrap = cx.getWrapFactory().wrap(cx, scope, re, null);
+            Object wrap = cx.getWrapFactory().wrap(cx, scope, re, TypeInfo.NONE);
             ScriptableObject.defineProperty(
                     errorObject,
                     "rhinoException",
@@ -5027,7 +5473,7 @@ public class ScriptRuntime {
     }
 
     public static void initFunction(
-            Context cx, Scriptable scope, NativeFunction function, int type, boolean fromEvalCode) {
+            Context cx, Scriptable scope, JSFunction function, int type, boolean fromEvalCode) {
         if (type == FunctionNode.FUNCTION_STATEMENT) {
             String name = function.getFunctionName();
             if (name != null && name.length() != 0) {
@@ -5169,25 +5615,46 @@ public class ScriptRuntime {
                     StringIdOrIndex s = toStringIdOrIndex(id);
                     if (s.stringId == null) {
                         object.put(s.index, object, value);
-                    } else if (isSpecialProperty(s.stringId)) {
-                        Ref ref = specialRef(object, s.stringId, cx, scope);
-                        ref.set(cx, scope, value);
-                    } else if(type == Token.CONST){
-                    	ScriptableObject.defineConstProperty(object, s.stringId);
                     } else {
-                        object.put(s.stringId, object, value);
+                        String stringId = s.stringId;
+                        if (cx.getLanguageVersion() < Context.VERSION_ES6
+                                && isSpecialProperty(stringId)) {
+                            Ref ref = specialRef(object, stringId, cx, scope);
+                            ref.set(cx, scope, value);
+                        } else if (cx.getLanguageVersion() >= Context.VERSION_ES6
+                                && NativeObject.PROTO_PROPERTY.equals(stringId)) {
+                            if (value == null) {
+                                object.setPrototype(null);
+                            } else if (value instanceof JSFunction) {
+                                if (((JSFunction) value).isShorthand()) {
+                                    object.put(stringId, object, value);
+                                } else {
+                                    NativeObject.js_protoSetter(object, value);
+                                }
+                            } else if (value instanceof Scriptable) {
+                                NativeObject.js_protoSetter(object, value);
+                            }
+                        } else {
+                            object.put(stringId, object, value);
+                        }
                     }
                 }
             } else {
                 ScriptableObject so = (ScriptableObject) object;
                 Callable getterOrSetter = (Callable) value;
                 boolean isSetter = getterSetter == 1;
-                Integer index = id instanceof Integer ? (Integer) id : null;
-                Object key =
-                        index != null
-                                ? null
-                                : (id instanceof Symbol ? id : ScriptRuntime.toString(id));
-                so.setGetterOrSetter(key, index == null ? 0 : index, getterOrSetter, isSetter);
+                if (isSymbol(id)) {
+                    so.setGetterOrSetter(id, 0, getterOrSetter, isSetter);
+                } else if (id instanceof Integer && ((Integer) id) >= 0) {
+                    so.setGetterOrSetter(null, (Integer) id, getterOrSetter, isSetter);
+                } else {
+                    StringIdOrIndex s = toStringIdOrIndex(id);
+                    so.setGetterOrSetter(
+                            s.getStringId(),
+                            s.getIndex() == -1 ? 0 : s.getIndex(),
+                            getterOrSetter,
+                            isSetter);
+                }
             }
         }
     }
@@ -5440,6 +5907,15 @@ public class ScriptRuntime {
         }
     }
 
+    private static void verifyIsScriptableOrComplainWriteErrorInEs5Strict(
+            Object obj, Object elem, Object value, Context cx) {
+        if (!(obj instanceof Scriptable)
+                && cx.isStrictMode()
+                && cx.getLanguageVersion() >= Context.VERSION_1_8) {
+            throw undefWriteError(obj, elem, value);
+        }
+    }
+
     public static RuntimeException undefReadError(Object object, Object id) {
         return typeErrorById("msg.undef.prop.read", toStringReturnNull(object), toStringReturnNull(id));
     }
@@ -5486,7 +5962,7 @@ public class ScriptRuntime {
     public static RuntimeException notFunctionError(Object obj, Object value, String propertyName) {
         // Use obj and value for better error reporting
         String objString = toStringReturnNull(obj);
-        if (obj instanceof NativeFunction) {
+        if (obj instanceof JSFunction) {
             // Omit function body in string representations of functions
             int paren = objString.indexOf(')');
             int curly = objString.indexOf('{', paren);
@@ -5660,18 +6136,21 @@ public class ScriptRuntime {
         return value;
     }
 
+    @Deprecated(since = "1.8.1", forRemoval = true)
     private static void storeScriptable(Context cx, Scriptable value) {
         // The previously stored scratchScriptable should be consumed
         if (cx.scratchScriptable != null) throw new IllegalStateException();
         cx.scratchScriptable = value;
     }
 
+    @Deprecated(since = "1.8.1", forRemoval = true)
     public static Scriptable lastStoredScriptable(Context cx) {
         Scriptable result = cx.scratchScriptable;
         cx.scratchScriptable = null;
         return result;
     }
 
+    @Deprecated(since = "1.8.1", forRemoval = true)
     public static void discardLastStoredScriptable(Context cx) {
         if (cx.scratchScriptable == null) throw new IllegalStateException();
         cx.scratchScriptable = null;
@@ -5688,7 +6167,7 @@ public class ScriptRuntime {
     static boolean isGeneratedScript(String sourceUrl) {
         // ALERT: this may clash with a valid URL containing (eval) or
         // (Function)
-        return sourceUrl.indexOf("(eval)") >= 0 || sourceUrl.indexOf("(Function)") >= 0;
+        return sourceUrl.contains("(eval)") || sourceUrl.contains("(Function)");
     }
 
     /**
@@ -5707,9 +6186,12 @@ public class ScriptRuntime {
     static boolean isUnregisteredSymbol(Object obj) {
         if (obj instanceof NativeSymbol) {
             NativeSymbol ns = (NativeSymbol) obj;
-            return ns.isSymbol() && ns.getKind() != NativeSymbol.SymbolKind.REGISTERED;
+            return ns.isSymbol() && ns.getKind() != Symbol.Kind.REGISTERED;
+        } else if (obj instanceof Symbol) {
+            Symbol s = (Symbol) obj;
+            return s.getKind() != Symbol.Kind.REGISTERED;
         }
-        return (obj instanceof SymbolKey);
+        return false;
     }
 
     private static RuntimeException errorWithClassName(String msg, Object val) {
@@ -5780,9 +6262,92 @@ public class ScriptRuntime {
         return null;
     }
 
+    /**
+     * Clamps value between min and max, inclusive.
+     *
+     * @return value if it is between min and max, otherwise min or max
+     */
+    public static int clamp(int value, int min, int max) {
+        if (value < min) {
+            return min;
+        } else if (value > max) {
+            return max;
+        } else {
+            return value;
+        }
+    }
+
+    /**
+     * This is returned from the various "getFooAndThis" methods, so it can return the result, the
+     * appropriate "this" object, and the name of the property so that a proper exception can be
+     * thrown if the result is not a function.
+     */
+    public static final class LookupResult implements Serializable {
+        private static final long serialVersionUID = 8491017987326545970L;
+
+        private final Object result;
+        private final Scriptable thisObj;
+        private final Object name;
+
+        LookupResult(Object result, Scriptable thisObj, Object name) {
+            this.result = result;
+            this.thisObj = thisObj;
+            this.name = name;
+        }
+
+        public Object getResult() {
+            return result;
+        }
+
+        public Scriptable getThis() {
+            return thisObj;
+        }
+
+        public String getName() {
+            return name == null ? "null" : name.toString();
+        }
+
+        /**
+         * Coerce the result to a Callable. If the result is not a Callable, throw a TypeError. The
+         * name is used in the error message.
+         */
+        public Callable getCallable() {
+            if (!(result instanceof Callable)) {
+                throw notFunctionError(result, name);
+            }
+            return (Callable) result;
+        }
+
+        /**
+         * A convenience method to coerce the result to a Callable as in "getCallable()", then call
+         * the result with ths stored "this".
+         */
+        public Object call(Context cx, Scriptable scope, Object[] args) {
+            return getCallable().call(cx, scope, thisObj, args);
+        }
+    }
+
+    private static int detectAndroidApi() {
+
+        try {
+            Class<?> versionClass = Class.forName("android.os.Build$VERSION");
+            Field sdkInt = versionClass.getField("SDK_INT");
+            return sdkInt.getInt(null);
+        } catch (NoSuchFieldException | IllegalAccessException | ClassNotFoundException e) {
+            if ("Dalvik".equals(System.getProperty("java.vm.name"))) {
+                // Fall back to vm-name
+                return 1;
+            }
+        }
+        return -1;
+    }
+
     public static final Object[] emptyArgs = new Object[0];
     public static final String[] emptyStrings = new String[0];
 
     static final XMLLoader xmlLoaderImpl =
             ScriptRuntime.loadOneServiceImplementation(XMLLoader.class);
+
+    /** This value holds the current android API version (or -1) if not running on android */
+    static final int androidApi = detectAndroidApi();
 }

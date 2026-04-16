@@ -8,6 +8,8 @@ package org.mozilla.javascript;
 
 import java.lang.reflect.Array;
 import java.util.Objects;
+import org.mozilla.javascript.lc.type.TypeInfo;
+import org.mozilla.javascript.lc.type.TypeInfoFactory;
 
 /**
  * This class reflects Java arrays into the JavaScript environment.
@@ -25,6 +27,7 @@ public class NativeJavaArray extends NativeJavaObject implements SymbolScriptabl
         return "JavaArray";
     }
 
+    @Deprecated
     public static NativeJavaArray wrap(Scriptable scope, Object array) {
         return new NativeJavaArray(scope, array);
     }
@@ -35,19 +38,22 @@ public class NativeJavaArray extends NativeJavaObject implements SymbolScriptabl
     }
 
     public NativeJavaArray(Scriptable scope, Object array) {
-        super(scope, null, ScriptRuntime.ObjectClass);
-        Class<?> cl = array.getClass();
-        if (!cl.isArray()) {
+        this(scope, array, TypeInfoFactory.GLOBAL.create(array.getClass()));
+    }
+
+    public NativeJavaArray(Scriptable scope, Object array, TypeInfo staticType) {
+        super(scope, null, staticType);
+        if (!staticType.isArray() || !array.getClass().isArray()) {
             throw new RuntimeException("Array expected");
         }
         this.array = array;
         this.length = Array.getLength(array);
-        this.cls = cl.getComponentType();
+        this.componentType = staticType.getComponentType();
     }
 
     @Override
     public boolean has(String id, Scriptable start) {
-        return id.equals("length") || super.has(id, start);
+        return "length".equals(id) || super.has(id, start);
     }
 
     @Override
@@ -62,7 +68,7 @@ public class NativeJavaArray extends NativeJavaObject implements SymbolScriptabl
 
     @Override
     public Object get(String id, Scriptable start) {
-        if (id.equals("length")) return Integer.valueOf(length);
+        if ("length".equals(id)) return Integer.valueOf(length);
         Object result = super.get(id, start);
         if (result == NOT_FOUND && !ScriptableObject.hasProperty(getPrototype(), id)) {
             throw Context.reportRuntimeErrorById(
@@ -76,7 +82,7 @@ public class NativeJavaArray extends NativeJavaObject implements SymbolScriptabl
         if (0 <= index && index < length) {
             Context cx = Context.getContext();
             Object obj = Array.get(array, index);
-            return cx.getWrapFactory().wrap(cx, this, obj, cls);
+            return cx.getWrapFactory().wrap(cx, this, obj, componentType);
         }
         return Undefined.instance;
     }
@@ -117,7 +123,7 @@ public class NativeJavaArray extends NativeJavaObject implements SymbolScriptabl
                     array = tmp;
                 }
             }
-            Array.set(array, index, Context.jsToJava(value, cls));
+            Array.set(array, index, Context.jsToJava(value, componentType));
             return;
         } else {
             throw Context.reportRuntimeErrorById(
@@ -170,9 +176,7 @@ public class NativeJavaArray extends NativeJavaObject implements SymbolScriptabl
 
     @Override
     public boolean hasInstance(Scriptable value) {
-        if (!(value instanceof Wrapper)) return false;
-        Object instance = ((Wrapper) value).unwrap();
-        return cls.isInstance(instance);
+        return value instanceof Wrapper && componentType.isInstance(((Wrapper) value).unwrap());
     }
 
     @Override
@@ -196,5 +200,5 @@ public class NativeJavaArray extends NativeJavaObject implements SymbolScriptabl
 
     Object array;
     int length;
-    Class<?> cls;
+    TypeInfo componentType;
 }

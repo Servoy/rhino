@@ -13,6 +13,8 @@ import org.mozilla.javascript.LambdaConstructor;
 import org.mozilla.javascript.ScriptRuntime;
 import org.mozilla.javascript.Scriptable;
 import org.mozilla.javascript.ScriptableObject;
+import org.mozilla.javascript.SymbolKey;
+import org.mozilla.javascript.TopLevel;
 import org.mozilla.javascript.Undefined;
 
 /**
@@ -26,7 +28,7 @@ public class NativeArrayBuffer extends ScriptableObject {
 
     private static final byte[] EMPTY_BUF = new byte[0];
 
-    final byte[] buffer;
+    byte[] buffer;
 
     @Override
     public String getClassName() {
@@ -43,21 +45,19 @@ public class NativeArrayBuffer extends ScriptableObject {
                         NativeArrayBuffer::js_constructor);
         constructor.setPrototypePropertyAttributes(DONTENUM | READONLY | PERMANENT);
 
-        constructor.defineConstructorMethod(
-                scope, "isView", 1, NativeArrayBuffer::js_isView, DONTENUM, DONTENUM | READONLY);
+        constructor.defineConstructorMethod(scope, "isView", 1, NativeArrayBuffer::js_isView);
+        constructor.definePrototypeMethod(scope, "slice", 2, NativeArrayBuffer::js_slice);
+        constructor.definePrototypeMethod(scope, "transfer", 0, NativeArrayBuffer::js_transfer);
         constructor.definePrototypeMethod(
-                scope,
-                "slice",
-                2,
-                (Context lcx, Scriptable lscope, Scriptable thisObj, Object[] args) ->
-                        js_slice(lcx, lscope, thisObj, constructor, args),
-                DONTENUM,
-                DONTENUM | READONLY);
+                scope, "transferToFixedLength", 0, NativeArrayBuffer::js_transferToFixedLength);
+        constructor.definePrototypeProperty(cx, "byteLength", NativeArrayBuffer::js_byteLength);
+        constructor.definePrototypeProperty(cx, "detached", NativeArrayBuffer::js_detached);
         constructor.definePrototypeProperty(
-                cx, "byteLength", NativeArrayBuffer::js_byteLength, DONTENUM | READONLY);
+                SymbolKey.TO_STRING_TAG, "ArrayBuffer", DONTENUM | READONLY);
 
         if (sealed) {
             constructor.sealObject();
+            ((ScriptableObject) constructor.getPrototypeProperty()).sealObject();
         }
         return constructor;
     }
@@ -94,7 +94,7 @@ public class NativeArrayBuffer extends ScriptableObject {
 
     /** Get the number of bytes in the buffer. */
     public int getLength() {
-        return buffer.length;
+        return buffer != null ? buffer.length : 0;
     }
 
     /**
@@ -103,6 +103,14 @@ public class NativeArrayBuffer extends ScriptableObject {
      */
     public byte[] getBuffer() {
         return buffer;
+    }
+
+    public void detach() {
+        buffer = null;
+    }
+
+    public boolean isDetached() {
+        return buffer == null;
     }
 
     /**
@@ -120,9 +128,9 @@ public class NativeArrayBuffer extends ScriptableObject {
         // Clamp as per the spec to between 0 and length
         int end =
                 ScriptRuntime.toInt32(
-                        Math.max(0, Math.min(buffer.length, (e < 0 ? buffer.length + e : e))));
+                        Math.max(0, Math.min(getLength(), (e < 0 ? getLength() + e : e))));
         int start =
-                ScriptRuntime.toInt32(Math.min(end, Math.max(0, (s < 0 ? buffer.length + s : s))));
+                ScriptRuntime.toInt32(Math.min(end, Math.max(0, (s < 0 ? getLength() + s : s))));
         int len = end - start;
 
         NativeArrayBuffer newBuf = new NativeArrayBuffer(len);
@@ -145,12 +153,13 @@ public class NativeArrayBuffer extends ScriptableObject {
     }
 
     private static NativeArrayBuffer js_slice(
-            Context cx,
-            Scriptable scope,
-            Scriptable thisObj,
-            LambdaConstructor defaultConstructor,
-            Object[] args) {
+            Context cx, Scriptable scope, Scriptable thisObj, Object[] args) {
         NativeArrayBuffer self = getSelf(thisObj);
+
+        if (self.isDetached()) {
+            throw ScriptRuntime.typeErrorById("msg.arraybuf.detached");
+        }
+
         double start = isArg(args, 0) ? ScriptRuntime.toNumber(args[0]) : 0;
         double end = isArg(args, 1) ? ScriptRuntime.toNumber(args[1]) : self.getLength();
         int endI =
@@ -167,7 +176,13 @@ public class NativeArrayBuffer extends ScriptableObject {
         int len = endI - startI;
 
         Constructable constructor =
-                AbstractEcmaObjectOperations.speciesConstructor(cx, thisObj, defaultConstructor);
+                AbstractEcmaObjectOperations.speciesConstructor(
+                        cx,
+                        thisObj,
+                        TopLevel.getBuiltinCtor(
+                                cx,
+                                ScriptableObject.getTopLevelScope(scope),
+                                TopLevel.Builtins.ArrayBuffer));
         Scriptable newBuf = constructor.construct(cx, scope, new Object[] {len});
         if (!(newBuf instanceof NativeArrayBuffer)) {
             throw ScriptRuntime.typeErrorById("msg.species.invalid.ctor");
@@ -191,7 +206,150 @@ public class NativeArrayBuffer extends ScriptableObject {
         return getSelf(thisObj).getLength();
     }
 
+    private static Object js_detached(Scriptable thisObj) {
+        return getSelf(thisObj).isDetached();
+    }
+
+    // ES2025 ArrayBuffer.prototype.transfer
+    private static Scriptable js_transfer(
+            Context cx, Scriptable scope, Scriptable thisObj, Object[] args) {
+        NativeArrayBuffer self = getSelf(thisObj);
+
+        // 1. Perform ? RequireInternalSlot(O, [[ArrayBufferData]])
+        // 2. If IsSharedArrayBuffer(O) is true, throw a TypeError exception
+        // (Rhino doesn't support SharedArrayBuffer, so this is implicit)
+
+        // 3. If IsDetachedBuffer(O) is true, throw a TypeError exception
+        if (self.isDetached()) {
+            throw ScriptRuntime.typeErrorById("msg.arraybuf.detached");
+        }
+
+        // 4. If newLength is undefined, let newByteLength be O.[[ArrayBufferByteLength]]
+        // 5. Else, let newByteLength be ? ToIntegerOrInfinity(newLength)
+        int newByteLength = validateNewByteLength(args, self.getLength());
+
+        // 6. Let new be ? Construct(%ArrayBuffer%, « 𝔽(newByteLength) »)
+        Constructable constructor =
+                AbstractEcmaObjectOperations.speciesConstructor(
+                        cx,
+                        thisObj,
+                        TopLevel.getBuiltinCtor(
+                                cx,
+                                ScriptableObject.getTopLevelScope(scope),
+                                TopLevel.Builtins.ArrayBuffer));
+        Scriptable newBuf = constructor.construct(cx, scope, new Object[] {newByteLength});
+        if (!(newBuf instanceof NativeArrayBuffer)) {
+            throw ScriptRuntime.typeErrorById("msg.species.invalid.ctor");
+        }
+        NativeArrayBuffer newBuffer = (NativeArrayBuffer) newBuf;
+
+        // 7. Let copyLength be min(newByteLength, O.[[ArrayBufferByteLength]])
+        int copyLength = Math.min(newByteLength, self.getLength());
+
+        // 8-11. Copy data from old buffer to new buffer
+        if (copyLength > 0) {
+            System.arraycopy(self.buffer, 0, newBuffer.buffer, 0, copyLength);
+        }
+
+        // 12. Perform ! DetachArrayBuffer(O)
+        self.detach();
+
+        // 13. Return new
+        return newBuf;
+    }
+
+    // ES2025 ArrayBuffer.prototype.transferToFixedLength
+    private static Scriptable js_transferToFixedLength(
+            Context cx, Scriptable scope, Scriptable thisObj, Object[] args) {
+        NativeArrayBuffer self = getSelf(thisObj);
+
+        // 1. Let O be the this value
+        // 2. Perform ? RequireInternalSlot(O, [[ArrayBufferData]])
+        // (getSelf handles this validation)
+
+        // 3. If IsSharedArrayBuffer(O) is true, throw a TypeError exception
+        // (Rhino doesn't support SharedArrayBuffer, so this is implicit)
+
+        // 4. If IsDetachedBuffer(O) is true, throw a TypeError exception
+        if (self.isDetached()) {
+            throw ScriptRuntime.typeErrorById("msg.arraybuf.detached");
+        }
+
+        // 5. If newLength is undefined, let newByteLength be O.[[ArrayBufferByteLength]]
+        // 6. Else, let newByteLength be ? ToIntegerOrInfinity(newLength)
+        // 7. If newByteLength < 0 or newByteLength is +∞, throw a RangeError exception
+        int newByteLength = validateNewByteLength(args, self.getLength());
+
+        // 8. Let new be ? Construct(%ArrayBuffer%, « 𝔽(newByteLength) »)
+        // Note: This creates a fixed-length buffer (no maxByteLength parameter)
+        Constructable constructor =
+                AbstractEcmaObjectOperations.speciesConstructor(
+                        cx,
+                        thisObj,
+                        TopLevel.getBuiltinCtor(
+                                cx,
+                                ScriptableObject.getTopLevelScope(scope),
+                                TopLevel.Builtins.ArrayBuffer));
+        Scriptable newBuf = constructor.construct(cx, scope, new Object[] {newByteLength});
+
+        // 9. NOTE: This method returns a fixed-length ArrayBuffer
+        // 10. If new.[[ArrayBufferDetachKey]] is not undefined, throw a TypeError exception
+        if (!(newBuf instanceof NativeArrayBuffer)) {
+            throw ScriptRuntime.typeErrorById("msg.species.invalid.ctor");
+        }
+        NativeArrayBuffer newBuffer = (NativeArrayBuffer) newBuf;
+
+        // 11. Let copyLength be min(newByteLength, O.[[ArrayBufferByteLength]])
+        int copyLength = Math.min(newByteLength, self.getLength());
+
+        // 12. Let fromBlock be O.[[ArrayBufferData]]
+        // 13. Let toBlock be new.[[ArrayBufferData]]
+        // 14. Perform CopyDataBlockBytes(toBlock, 0, fromBlock, 0, copyLength)
+        // 15. NOTE: Neither creation of the new ArrayBuffer nor copying from the old
+        //     ArrayBuffer are observable. Implementations may implement this method
+        //     as a zero-copy move or a realloc
+        if (copyLength > 0) {
+            System.arraycopy(self.buffer, 0, newBuffer.buffer, 0, copyLength);
+        }
+
+        // 16. Perform ! DetachArrayBuffer(O)
+        self.detach();
+
+        // 17. Return new
+        return newBuf;
+    }
+
     private static boolean isArg(Object[] args, int i) {
         return ((args.length > i) && !Undefined.instance.equals(args[i]));
+    }
+
+    /**
+     * Validates and converts the newLength parameter for transfer operations. Implements
+     * ToIntegerOrInfinity conversion and range validation.
+     *
+     * @param args the arguments array
+     * @param defaultLength the default length if no argument is provided
+     * @return the validated byte length as an integer
+     * @throws RangeError if the length is invalid
+     */
+    private static int validateNewByteLength(Object[] args, int defaultLength) {
+        double newLength = isArg(args, 0) ? ScriptRuntime.toNumber(args[0]) : defaultLength;
+
+        // ToIntegerOrInfinity: Handle NaN (convert to 0)
+        if (Double.isNaN(newLength)) {
+            newLength = 0;
+        }
+
+        // Check for negative or infinite values
+        if (newLength < 0 || Double.isInfinite(newLength)) {
+            throw ScriptRuntime.rangeError("Invalid array buffer length");
+        }
+
+        // Check for values too large for Java arrays
+        if (newLength >= Integer.MAX_VALUE) {
+            throw ScriptRuntime.rangeError("Array buffer length too large");
+        }
+
+        return (int) newLength;
     }
 }

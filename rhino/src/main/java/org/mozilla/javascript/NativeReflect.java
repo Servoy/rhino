@@ -8,6 +8,7 @@ package org.mozilla.javascript;
 
 import java.util.ArrayList;
 import java.util.List;
+import org.mozilla.javascript.ScriptRuntime.StringIdOrIndex;
 
 /**
  * This class implements the Reflect object.
@@ -24,64 +25,21 @@ final class NativeReflect extends ScriptableObject {
         reflect.setPrototype(getObjectPrototype(scope));
         reflect.setParentScope(scope);
 
-        reflect.defineProperty(
-                scope, "apply", 3, NativeReflect::apply, DONTENUM, DONTENUM | READONLY);
-        reflect.defineProperty(
-                scope, "construct", 2, NativeReflect::construct, DONTENUM, DONTENUM | READONLY);
-        reflect.defineProperty(
-                scope,
-                "defineProperty",
-                3,
-                NativeReflect::defineProperty,
-                DONTENUM,
-                DONTENUM | READONLY);
-        reflect.defineProperty(
-                scope,
-                "deleteProperty",
-                2,
-                NativeReflect::deleteProperty,
-                DONTENUM,
-                DONTENUM | READONLY);
-        reflect.defineProperty(scope, "get", 2, NativeReflect::get, DONTENUM, DONTENUM | READONLY);
-        reflect.defineProperty(
-                scope,
-                "getOwnPropertyDescriptor",
-                2,
-                NativeReflect::getOwnPropertyDescriptor,
-                DONTENUM,
-                DONTENUM | READONLY);
-        reflect.defineProperty(
-                scope,
-                "getPrototypeOf",
-                1,
-                NativeReflect::getPrototypeOf,
-                DONTENUM,
-                DONTENUM | READONLY);
-        reflect.defineProperty(scope, "has", 2, NativeReflect::has, DONTENUM, DONTENUM | READONLY);
-        reflect.defineProperty(
-                scope,
-                "isExtensible",
-                1,
-                NativeReflect::isExtensible,
-                DONTENUM,
-                DONTENUM | READONLY);
-        reflect.defineProperty(
-                scope, "ownKeys", 1, NativeReflect::ownKeys, DONTENUM, DONTENUM | READONLY);
-        reflect.defineProperty(
-                scope,
-                "preventExtensions",
-                1,
-                NativeReflect::preventExtensions,
-                DONTENUM,
-                DONTENUM | READONLY);
-        reflect.defineProperty(scope, "set", 3, NativeReflect::set, DONTENUM, DONTENUM | READONLY);
-        reflect.defineProperty(
-                scope,
-                "setPrototypeOf",
-                2,
-                NativeReflect::setPrototypeOf,
-                DONTENUM,
-                DONTENUM | READONLY);
+        reflect.defineBuiltinProperty(scope, "apply", 3, NativeReflect::apply);
+        reflect.defineBuiltinProperty(scope, "construct", 2, NativeReflect::construct);
+        reflect.defineBuiltinProperty(scope, "defineProperty", 3, NativeReflect::defineProperty);
+        reflect.defineBuiltinProperty(scope, "deleteProperty", 2, NativeReflect::deleteProperty);
+        reflect.defineBuiltinProperty(scope, "get", 2, NativeReflect::get);
+        reflect.defineBuiltinProperty(
+                scope, "getOwnPropertyDescriptor", 2, NativeReflect::getOwnPropertyDescriptor);
+        reflect.defineBuiltinProperty(scope, "getPrototypeOf", 1, NativeReflect::getPrototypeOf);
+        reflect.defineBuiltinProperty(scope, "has", 2, NativeReflect::has);
+        reflect.defineBuiltinProperty(scope, "isExtensible", 1, NativeReflect::isExtensible);
+        reflect.defineBuiltinProperty(scope, "ownKeys", 1, NativeReflect::ownKeys);
+        reflect.defineBuiltinProperty(
+                scope, "preventExtensions", 1, NativeReflect::preventExtensions);
+        reflect.defineBuiltinProperty(scope, "set", 3, NativeReflect::set);
+        reflect.defineBuiltinProperty(scope, "setPrototypeOf", 2, NativeReflect::setPrototypeOf);
 
         reflect.defineProperty(SymbolKey.TO_STRING_TAG, REFLECT_TAG, DONTENUM | READONLY);
         if (sealed) {
@@ -123,7 +81,10 @@ final class NativeReflect extends ScriptableObject {
                 true, cx, scope, callable, new Object[] {thisObj, argumentsList});
     }
 
-    /** see https://262.ecma-international.org/12.0/#sec-reflect.construct */
+    /**
+     * see <a href="https://262.ecma-international.org/12.0/#sec-reflect.construct">28.1.2
+     * Reflect.construct (target, argumentsList[, newTarget])</a>
+     */
     private static Scriptable construct(
             Context cx, Scriptable scope, Scriptable thisObj, Object[] args) {
         /*
@@ -210,10 +171,20 @@ final class NativeReflect extends ScriptableObject {
         }
 
         ScriptableObject target = checkTarget(args);
-        ScriptableObject desc = ScriptableObject.ensureScriptableObject(args[2]);
+        DescriptorInfo desc = new DescriptorInfo(ScriptableObject.ensureScriptableObject(args[2]));
+
+        Object key = args[1];
 
         try {
-            return target.defineOwnProperty(cx, args[1], desc);
+            if (key instanceof Symbol) {
+                return target.defineOwnProperty(cx, key, desc);
+            } else {
+                String propertyKey =
+                        ScriptRuntime.toString(
+                                ScriptRuntime.toPrimitive(key, ScriptRuntime.StringClass));
+                return target.defineOwnProperty(cx, propertyKey, desc);
+            }
+
         } catch (EcmaError e) {
             return false;
         }
@@ -258,13 +229,12 @@ final class NativeReflect extends ScriptableObject {
 
         if (args.length > 1) {
             if (ScriptRuntime.isSymbol(args[1])) {
-                ScriptableObject desc = target.getOwnPropertyDescriptor(cx, args[1]);
-                return desc == null ? Undefined.SCRIPTABLE_UNDEFINED : desc;
+                var desc = target.getOwnPropertyDescriptor(cx, args[1]);
+                return desc == null ? Undefined.SCRIPTABLE_UNDEFINED : desc.toObject(scope);
             }
 
-            ScriptableObject desc =
-                    target.getOwnPropertyDescriptor(cx, ScriptRuntime.toString(args[1]));
-            return desc == null ? Undefined.SCRIPTABLE_UNDEFINED : desc;
+            var desc = target.getOwnPropertyDescriptor(cx, ScriptRuntime.toString(args[1]));
+            return desc == null ? Undefined.SCRIPTABLE_UNDEFINED : desc.toObject(scope);
         }
         return Undefined.SCRIPTABLE_UNDEFINED;
     }
@@ -302,7 +272,11 @@ final class NativeReflect extends ScriptableObject {
         final List<Object> strings = new ArrayList<>();
         final List<Object> symbols = new ArrayList<>();
 
-        for (Object o : target.getIds(true, true)) {
+        Object[] ids;
+        try (var map = target.startCompoundOp(false)) {
+            ids = target.getIds(map, true, true);
+        }
+        for (Object o : ids) {
             if (o instanceof Symbol) {
                 symbols.add(o);
             } else {
@@ -333,15 +307,15 @@ final class NativeReflect extends ScriptableObject {
         ScriptableObject receiver =
                 args.length > 3 ? ScriptableObject.ensureScriptableObject(args[3]) : target;
         if (receiver != target) {
-            ScriptableObject descriptor = target.getOwnPropertyDescriptor(cx, args[1]);
+            DescriptorInfo descriptor = target.getOwnPropertyDescriptor(cx, args[1]);
             if (descriptor != null) {
-                Object setter = descriptor.get("set");
+                Object setter = descriptor.setter;
                 if (setter != null && setter != NOT_FOUND) {
                     ((Function) setter).call(cx, scope, receiver, new Object[] {args[2]});
                     return true;
                 }
 
-                if (Boolean.FALSE.equals(descriptor.get("configurable"))) {
+                if (descriptor.isConfigurable(false)) {
                     return false;
                 }
             }
@@ -349,10 +323,13 @@ final class NativeReflect extends ScriptableObject {
 
         if (ScriptRuntime.isSymbol(args[1])) {
             receiver.put((Symbol) args[1], receiver, args[2]);
-        } else if (args[1] instanceof Double) {
-            receiver.put(ScriptRuntime.toIndex(args[1]), receiver, args[2]);
         } else {
-            receiver.put(ScriptRuntime.toString(args[1]), receiver, args[2]);
+            StringIdOrIndex s = ScriptRuntime.toStringIdOrIndex(args[1]);
+            if (s.stringId == null) {
+                receiver.put(s.index, receiver, args[2]);
+            } else {
+                receiver.put(s.stringId, receiver, args[2]);
+            }
         }
 
         return true;

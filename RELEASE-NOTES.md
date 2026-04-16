@@ -1,3 +1,67 @@
+# Rhino 1.9.1
+## February 15, 2026
+
+This release fixes a few small regressions introduced in Rhino 1.9.0.
+
+* Ensure that the "global" object is present, necessary for core-js to run
+* Prevent compiled methods from introducing illegal characters in their names
+* Support reserved words like "class" as names of XML attributes
+* Fix a performance regression in the RegExp engine.
+
+Thanks to all who contributed!
+
+# Rhino 1.9.0
+## December 22, 2025
+
+This release represents about a year of work on Rhino by a growing team of contributors.
+
+Some of the improvements include:
+
+* Compatibility improvements in areas like destructuring and spread syntax.
+* Performance improvements from 10 to 30% in benchmarks like Delta Blue, Earley-Boyer, and Crypto in both interpreted and compiled mode
+* Better support for generics and other things when Java integration is used.
+
+Some other improvements:
+
+JavaScript Language Updates:
+  * ES6+: Significant advancements in destructuring, spread syntax for
+    arrays/objects, Symbol API, and improved let/const scoping.
+    TypedArray.from/of and BigInt.asUintN/asIntN fixes.
+  * RegExp: New features like named capture groups, lookbehind
+    assertions, and Unicode mode support.
+  * Future ES (ES2024/2025): Early implementation of proposals such as
+    Promise.withResolvers, Promise.try, ArrayBuffer transfer methods, and
+    new Set methods.
+
+Core Engine Enhancements:
+  * Major Refactoring: Extensive migration of built-in objects to a
+    lambda-based architecture and a comprehensive overhaul of the
+    interpreter bytecodes for better performance and maintainability.
+  * Concurrency & Interop: Continued focus on thread safety improvements
+    and enhanced Java interoperability, including better generics
+    support.
+
+Going forward -- we have lots of plans for Rhino, including some changes that may 
+affect compatibility for projects that embed Rhino into larger frameworks. We think
+that these changes will be worth it because they will unlock better language 
+compatibility and performance.
+
+As such, the next version going forward will be 2.0.0-SNAPSHOT.
+
+Thanks to everyone who contributed!
+
+# Rhino 1.8.1, Rhino 1.7.15.1, Rhino 1.7.14.1
+## December 2, 2025
+
+These releases fix a bug in the code that formats floating-point numbers into strings
+that could result in very bad performance in some cases.
+
+We recommend that all users of Rhino upgrade to release 1.8.1 if possible,
+and upgrade to Java 17 or 21. 
+
+Users who need an older release, or who cannot yet leave Java 8, can also
+use 1.7.15.1 or 1.7.14.1.
+
 # Rhino 1.8.0
 ## January 2, 2025
 

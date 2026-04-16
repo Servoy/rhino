@@ -10,10 +10,14 @@ Rhino is licensed under the [MPL 2.0](./LICENSE.txt).
 
 ## Releases
 
-The current release is <a href="https://github.com/mozilla/rhino/releases/tag/Rhino1_7_15_Release">Rhino 1.7.15</a>. Please see the [Release Notes](./RELEASE-NOTES.md).
+The current release is <a href="https://github.com/mozilla/rhino/releases/tag/Rhino1_9_0_Release">Rhino 1.9.0</a>. Please see the [Release Notes](./RELEASE-NOTES.md).
 
 <details><summary>Releases</summary>
 <table>
+<tr><td><a href="https://github.com/mozilla/rhino/releases/tag/Rhino1_9_1_Release">Rhino 1.9.1</a></td><td>February 15, 2026</td></tr>
+<tr><td><a href="https://github.com/mozilla/rhino/releases/tag/Rhino1_9_0_Release">Rhino 1.9.0</a></td><td>December 22, 2025</td></tr>
+<tr><td><a href="https://github.com/mozilla/rhino/releases/tag/Rhino1_8_1_Release">Rhino 1.8.1</a></td><td>December 2, 2025</td></tr>
+<tr><td><a href="https://github.com/mozilla/rhino/releases/tag/Rhino1_8_0_Release">Rhino 1.8.0</a></td><td>January 2, 2025</td></tr>
 <tr><td><a href="https://github.com/mozilla/rhino/releases/tag/Rhino1_7_15_Release">Rhino 1.7.15</a></td><td>May 3, 2024</td></tr>
 <tr><td><a href="https://github.com/mozilla/rhino/releases/tag/Rhino1_7_14_Release">Rhino 1.7.14</a></td><td>January 6, 2022</td></tr>
 <tr><td><a href="https://github.com/mozilla/rhino/releases/tag/Rhino1_7_13_Release">Rhino 1.7.13</a></td><td>September 2, 2020</td></tr>
@@ -46,6 +50,8 @@ JavaDoc for all the APIs:
 
 [https://javadoc.io/doc/org.mozilla/rhino](https://javadoc.io/doc/org.mozilla/rhino)
 
+[List of projects using Rhino](USAGE.md)
+
 ## Code Structure
 
 Rhino 1.7.15 and before were primarily used in a single JAR called "rhino.jar".
@@ -64,6 +70,7 @@ The release contains the following other modules, which are used while building 
 testing but which are not published to Maven Central:
 
 * **tests**: The tests that depend on all of Rhino and also the external tests, including the Mozilla legacy test scripts and the test262 tests.
+* **it-android**: Integration tests for android, [see the details.](./it-android/README.md)
 * **benchmarks**: Runs benchmarks using JMH.
 * **examples**: Surprisingly, this contains example code.
 
@@ -101,6 +108,17 @@ You can also run the benchmarks:
 
     ./gradlew jmh
 
+When running the benchmarks you may find a couple of environment variables useful.
+* `BENCHMARK` if set will limit the benchmarks run to those matching
+  the regular expression given.
+* `INTERPRETED` can be set to `true` or `false` to only run the
+  benchmarks in interpreted or compiled mode.
+* `PROFILERS` can be set to `cpu` or `alloc` to run the async profiler
+  for cpu time or memory allocations, or can be set to any other
+  string which will be passed to jmh as the value of the profilers
+  argument. This allows for things like running JFR as the profiler to
+  collect information on lock contention or other events.
+
 ### Testing on other Java Versions
 
 It is a good idea to test major changes on Java 11 before assuming that they will pass the CI
@@ -115,7 +133,11 @@ this using the command:
     ./gradlew -q javaToolchains
 
 Not all installers seem to put JDKs in the places where Gradle can find them. When in doubt,
-installatioons from [Adoptium](https://adoptium.net) seem to work on most platforms.
+installations from [Adoptium](https://adoptium.net) seem to work on most platforms.
+
+### Testing on Android
+
+[see here](./it-android/README.md)
 
 ### Code Coverage
 

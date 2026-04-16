@@ -11,6 +11,7 @@ import org.mozilla.javascript.LambdaConstructor;
 import org.mozilla.javascript.ScriptRuntime;
 import org.mozilla.javascript.ScriptRuntimeES6;
 import org.mozilla.javascript.Scriptable;
+import org.mozilla.javascript.ScriptableObject;
 import org.mozilla.javascript.Undefined;
 
 /**
@@ -62,6 +63,7 @@ public class NativeFloat64Array extends NativeTypedArrayView<Double> {
         ScriptRuntimeES6.addSymbolSpecies(cx, scope, constructor);
         if (sealed) {
             constructor.sealObject();
+            ((ScriptableObject) constructor.getPrototypeProperty()).sealObject();
         }
         return constructor;
     }
@@ -90,10 +92,10 @@ public class NativeFloat64Array extends NativeTypedArrayView<Double> {
 
     @Override
     protected Object js_set(int index, Object c) {
+        double val = ScriptRuntime.toNumber(c);
         if (checkIndex(index)) {
             return Undefined.instance;
         }
-        double val = ScriptRuntime.toNumber(c);
         long base = Double.doubleToLongBits(val);
         ByteIo.writeUint64(
                 arrayBuffer.buffer, (index * BYTES_PER_ELEMENT) + offset, base, useLittleEndian());
@@ -102,17 +104,13 @@ public class NativeFloat64Array extends NativeTypedArrayView<Double> {
 
     @Override
     public Double get(int i) {
-        if (checkIndex(i)) {
-            throw new IndexOutOfBoundsException();
-        }
+        ensureIndex(i);
         return (Double) js_get(i);
     }
 
     @Override
     public Double set(int i, Double aByte) {
-        if (checkIndex(i)) {
-            throw new IndexOutOfBoundsException();
-        }
+        ensureIndex(i);
         return (Double) js_set(i, aByte);
     }
 }

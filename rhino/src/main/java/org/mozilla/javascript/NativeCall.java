@@ -24,20 +24,22 @@ public final class NativeCall extends IdScriptableObject {
         obj.exportAsJSClass(MAX_PROTOTYPE_ID, scope, sealed);
     }
 
-    NativeCall() {}
+    NativeCall() {
+        function = null;
+        originalArgs = null;
+        isStrict = false;
+    }
 
     NativeCall(
-            NativeFunction function,
+            JSFunction function,
             Context cx,
             Scriptable scope,
             Object[] args,
             boolean isArrow,
             boolean isStrict,
             boolean argsHasRest,
-            Scriptable homeObject) {
+            boolean requiresArgumentObject) {
         this.function = function;
-        this.homeObject = homeObject;
-        this.isArrow = isArrow;
 
         setParentScope(scope);
         // leave prototype null
@@ -78,9 +80,8 @@ public final class NativeCall extends IdScriptableObject {
 
         // initialize "arguments" property but only if it was not overridden by
         // the parameter with the same name
-        if (!super.has("arguments", this) && !isArrow) {
-            arguments = new Arguments(this);
-            defineProperty("arguments", arguments, PERMANENT);
+        if (requiresArgumentObject && !isArrow && !super.has("arguments", this)) {
+            defineProperty("arguments", new Arguments(this, cx), PERMANENT);
         }
 
         if (paramAndVarCount != 0) {
@@ -89,8 +90,7 @@ public final class NativeCall extends IdScriptableObject {
                 if (!super.has(name, this)) {
                     if (function.getParamOrVarConst(i)) {
                         defineProperty(name, Undefined.instance, CONST);
-                    } else if (!(function instanceof InterpretedFunction)
-                            || ((InterpretedFunction) function).hasFunctionNamed(name)) {
+                    } else if (function.hasFunctionNamed(name)) {
                         defineProperty(name, Undefined.instance, PERMANENT);
                     }
                 }
@@ -105,7 +105,7 @@ public final class NativeCall extends IdScriptableObject {
 
     @Override
     protected int findPrototypeId(String s) {
-        return s.equals("constructor") ? Id_constructor : 0;
+        return "constructor".equals(s) ? Id_constructor : 0;
     }
 
     @Override
@@ -140,24 +140,15 @@ public final class NativeCall extends IdScriptableObject {
         throw new IllegalArgumentException(String.valueOf(id));
     }
 
-    public void defineAttributesForArguments() {
-        if (arguments != null) {
-            arguments.defineAttributesForStrictMode();
-        }
-    }
-
     public Scriptable getHomeObject() {
-        return homeObject;
+        return function.getHomeObject();
     }
 
     private static final int Id_constructor = 1, MAX_PROTOTYPE_ID = 1;
 
-    NativeFunction function;
-    Object[] originalArgs;
-    boolean isStrict;
-    private Arguments arguments;
-    boolean isArrow;
-    private Scriptable homeObject;
+    final JSFunction function;
+    final Object[] originalArgs;
+    final boolean isStrict;
 
     transient NativeCall parentActivationCall;
 }

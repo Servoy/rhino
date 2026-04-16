@@ -9,33 +9,40 @@ import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import org.mozilla.javascript.lc.type.TypeInfo;
+import org.mozilla.javascript.lc.type.TypeInfoFactory;
 
 /**
- * <code>NativeJavaMap</code> is a wrapper for java objects implementing <code>java.util.Map
- * </code> interface. When {@link Context#FEATURE_ENABLE_JAVA_MAP_ACCESS} is enabled, property based
- * access like <code>map[key]</code> is delegated to {@link Map#get(Object)} or {@link
- * Map#put(Object, Object)} operations so that a <code>JavaMap</code> acts very similar to a
- * javascript <code>Object</code> There is also an iterator to iterate over entries with <code>
- * for .. of</code>.
+ * {@code NativeJavaMap} is a wrapper for java objects implementing {@code java.util.Map }
+ * interface. When {@link Context#FEATURE_ENABLE_JAVA_MAP_ACCESS} is enabled, property-based access
+ * like {@code map[key]} is delegated to {@link Map#get(Object)} or {@link Map#put(Object, Object)}
+ * operations so that a {@code JavaMap} acts very similar to a javascript {@code Object} There is
+ * also an iterator to iterate over entries with {@code for .. of}.
  *
- * <p><b>Limitations:</b> The wrapped map should have <code>String</code> or <code>Integer</code> as
- * key. Otherwise, property based access may not work properly.
+ * <p><b>Limitations:</b> The wrapped map should have {@code String} or {@code Integer} as key.
+ * Otherwise, property-based access may not work properly.
  */
 public class NativeJavaMap extends NativeJavaObject {
 
     private static final long serialVersionUID = -3786257752907047381L;
 
-    private Map<Object, Object> map;
+    private final Map<Object, Object> map;
+    private final TypeInfo keyType;
+    private final TypeInfo valueType;
 
     static void init(ScriptableObject scope, boolean sealed) {
         NativeJavaMapIterator.init(scope, sealed);
     }
 
     @SuppressWarnings("unchecked")
-    public NativeJavaMap(Scriptable scope, Object map) {
-        super(scope, map, map.getClass());
+    public NativeJavaMap(Scriptable scope, Object map, TypeInfo staticType) {
+        super(scope, map, staticType);
         assert map instanceof Map;
         this.map = (Map<Object, Object>) map;
+
+        var typeFactory = TypeInfoFactory.getOrElse(scope, TypeInfoFactory.GLOBAL);
+        this.keyType = typeFactory.consolidateType(MapTypeVariables.K, staticType);
+        this.valueType = typeFactory.consolidateType(MapTypeVariables.V, staticType);
     }
 
     @Override
@@ -58,7 +65,8 @@ public class NativeJavaMap extends NativeJavaObject {
     public boolean has(int index, Scriptable start) {
         Context cx = Context.getCurrentContext();
         if (cx != null && cx.hasFeature(Context.FEATURE_ENABLE_JAVA_MAP_ACCESS)) {
-            if (map.containsKey(Integer.valueOf(index))) {
+            var key = Integer.valueOf(index);
+            if (map.containsKey(key)) {
                 return true;
             }
         }
@@ -78,8 +86,7 @@ public class NativeJavaMap extends NativeJavaObject {
         Context cx = Context.getCurrentContext();
         if (cx != null && cx.hasFeature(Context.FEATURE_ENABLE_JAVA_MAP_ACCESS)) {
             if (map.containsKey(name)) {
-                Object obj = map.get(name);
-                return cx.getWrapFactory().wrap(cx, this, obj, obj == null ? null : obj.getClass());
+                return cx.getWrapFactory().wrap(cx, this, map.get(name), valueType);
             }
         }
         return super.get(name, start);
@@ -89,9 +96,9 @@ public class NativeJavaMap extends NativeJavaObject {
     public Object get(int index, Scriptable start) {
         Context cx = Context.getCurrentContext();
         if (cx != null && cx.hasFeature(Context.FEATURE_ENABLE_JAVA_MAP_ACCESS)) {
-            if (map.containsKey(Integer.valueOf(index))) {
-                Object obj = map.get(Integer.valueOf(index));
-                return cx.getWrapFactory().wrap(cx, this, obj, obj == null ? null : obj.getClass());
+            var key = Integer.valueOf(index);
+            if (map.containsKey(key)) {
+                return cx.getWrapFactory().wrap(cx, this, map.get(key), valueType);
             }
         }
         return super.get(index, start);
@@ -109,7 +116,7 @@ public class NativeJavaMap extends NativeJavaObject {
     public void put(String name, Scriptable start, Object value) {
         Context cx = Context.getCurrentContext();
         if (cx != null && cx.hasFeature(Context.FEATURE_ENABLE_JAVA_MAP_ACCESS)) {
-            map.put(name, Context.jsToJava(value, Object.class));
+            map.put(name, Context.jsToJava(value, valueType));
         } else {
             super.put(name, start, value);
         }
@@ -117,9 +124,9 @@ public class NativeJavaMap extends NativeJavaObject {
 
     @Override
     public void put(int index, Scriptable start, Object value) {
-        Context cx = Context.getContext();
+        Context cx = Context.getCurrentContext();
         if (cx != null && cx.hasFeature(Context.FEATURE_ENABLE_JAVA_MAP_ACCESS)) {
-            map.put(Integer.valueOf(index), Context.jsToJava(value, Object.class));
+            map.put(index, Context.jsToJava(value, valueType));
         } else {
             super.put(index, start, value);
         }
@@ -157,7 +164,7 @@ public class NativeJavaMap extends NativeJavaObject {
                 if (!(thisObj instanceof NativeJavaMap)) {
                     throw ScriptRuntime.typeErrorById("msg.incompat.call", SymbolKey.ITERATOR);
                 }
-                return new NativeJavaMapIterator(scope, ((NativeJavaMap) thisObj).map);
+                return new NativeJavaMapIterator(scope, (NativeJavaMap) thisObj);
             };
 
     private static final class NativeJavaMapIterator extends ES6Iterator {
@@ -173,9 +180,11 @@ public class NativeJavaMap extends NativeJavaObject {
             super();
         }
 
-        NativeJavaMapIterator(Scriptable scope, Map<Object, Object> map) {
+        NativeJavaMapIterator(Scriptable scope, NativeJavaMap map) {
             super(scope, ITERATOR_TAG);
-            this.iterator = map.entrySet().iterator();
+            this.iterator = map.map.entrySet().iterator();
+            this.keyType = map.keyType;
+            this.valueType = map.valueType;
         }
 
         @Override
@@ -197,8 +206,8 @@ public class NativeJavaMap extends NativeJavaObject {
             Object key = e.getKey();
             Object value = e.getValue();
             WrapFactory wrapFactory = cx.getWrapFactory();
-            key = wrapFactory.wrap(cx, this, key, key == null ? null : key.getClass());
-            value = wrapFactory.wrap(cx, this, value, value == null ? null : value.getClass());
+            key = wrapFactory.wrap(cx, this, key, keyType);
+            value = wrapFactory.wrap(cx, this, value, valueType);
 
             return cx.newArray(scope, new Object[] {key, value});
         }
@@ -209,5 +218,12 @@ public class NativeJavaMap extends NativeJavaObject {
         }
 
         private Iterator<Map.Entry<Object, Object>> iterator;
+        private TypeInfo keyType;
+        private TypeInfo valueType;
+    }
+
+    private interface MapTypeVariables {
+        TypeInfo K = TypeInfoFactory.GLOBAL.create(Map.class.getTypeParameters()[0]);
+        TypeInfo V = TypeInfoFactory.GLOBAL.create(Map.class.getTypeParameters()[1]);
     }
 }

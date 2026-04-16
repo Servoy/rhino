@@ -26,3 +26,10 @@ rhino.iws
 
 # VSCode
 .vscode
+
+.java-version
+.kotlin
+
+# android specific
+android-sdk/
+local.properties

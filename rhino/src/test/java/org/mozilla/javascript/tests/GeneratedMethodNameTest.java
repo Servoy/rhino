@@ -64,9 +64,19 @@ public class GeneratedMethodNameTest {
     @Test
     public void anonymousFunction() throws Exception {
         final String scriptCode =
-                "var myFunc = function() {\n"
+                "(function() {\n"
                         + " var m = javaNameGetter.readCurrentFunctionJavaName();\n"
                         + "  if (m != 'anonymous') throw 'got '  + m;"
+                        + "})();";
+        doTest(scriptCode);
+    }
+
+    @Test
+    public void anonymousFunctionAssignedToVariable() throws Exception {
+        final String scriptCode =
+                "var myFunc = function() {\n"
+                        + " var m = javaNameGetter.readCurrentFunctionJavaName();\n"
+                        + "  if (m != 'myFunc') throw 'got '  + m;"
                         + "}\n"
                         + "myFunc();";
         doTest(scriptCode);
@@ -76,7 +86,7 @@ public class GeneratedMethodNameTest {
         public String readCurrentFunctionJavaName() {
             final Throwable t = new RuntimeException();
             // remove prefix and suffix of method name
-            return t.getStackTrace()[8].getMethodName().replaceFirst("_[^_]*_(.*)_[^_]*", "$1");
+            return t.getStackTrace()[7].getMethodName().replaceFirst("_[^_]*_(.*)_[^_]*", "$1");
         }
     }
 
@@ -89,7 +99,7 @@ public class GeneratedMethodNameTest {
             Scriptable topScope = cx.initStandardObjects();
             topScope.put("javaNameGetter", topScope, new JavaNameGetter());
             Script script = cx.compileString(scriptCode, "myScript", 1, null);
-            script.exec(cx, topScope);
+            script.exec(cx, topScope, topScope);
         }
     }
 

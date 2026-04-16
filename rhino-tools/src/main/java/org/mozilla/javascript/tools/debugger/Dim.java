@@ -17,14 +17,14 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import org.mozilla.javascript.Callable;
 import org.mozilla.javascript.Context;
 import org.mozilla.javascript.ContextAction;
 import org.mozilla.javascript.ContextFactory;
 import org.mozilla.javascript.ImporterTopLevel;
 import org.mozilla.javascript.Kit;
 import org.mozilla.javascript.NativeCall;
-import org.mozilla.javascript.NativeWith;
+import org.mozilla.javascript.NativeObject;
+import org.mozilla.javascript.Script;
 import org.mozilla.javascript.ScriptRuntime;
 import org.mozilla.javascript.Scriptable;
 import org.mozilla.javascript.ScriptableObject;
@@ -543,9 +543,9 @@ public class Dim {
             String name = (String) id;
             if (name.equals("this")) {
                 result = scriptable;
-            } else if (name.equals("__proto__")) {
+            } else if (name.equals(NativeObject.PROTO_PROPERTY)) {
                 result = scriptable.getPrototype();
-            } else if (name.equals("__parent__")) {
+            } else if (name.equals(NativeObject.PARENT_PROPERTY)) {
                 result = scriptable.getParentScope();
             } else {
                 result = ScriptableObject.getProperty(scriptable, name);
@@ -592,10 +592,10 @@ public class Dim {
             ids = tmp;
             extra = 0;
             if (proto != null) {
-                ids[extra++] = "__proto__";
+                ids[extra++] = NativeObject.PROTO_PROPERTY;
             }
             if (parent != null) {
-                ids[extra++] = "__parent__";
+                ids[extra++] = NativeObject.PARENT_PROPERTY;
             }
         }
 
@@ -745,8 +745,15 @@ public class Dim {
         cx.setInterpretedMode(false);
         cx.setGeneratingDebug(false);
         try {
-            Callable script = (Callable) cx.compileString(expr, "", 0, null);
-            Object result = script.call(cx, frame.scope, frame.thisObj, ScriptRuntime.emptyArgs);
+            Scriptable scope = frame.scope;
+            if (!frame.isFunction && scope != null) {
+                Scriptable parentScope = scope.getParentScope();
+                if (parentScope != null) {
+                    scope = parentScope;
+                }
+            }
+            Script script = cx.compileString(expr, "", 0, null);
+            Object result = script.exec(cx, scope, frame.thisObj);
             if (result == Undefined.instance) {
                 resultString = "";
             } else {
@@ -896,7 +903,7 @@ public class Dim {
                 // Can not debug if source is not available
                 return null;
             }
-            return new StackFrame(cx, dim, item);
+            return new StackFrame(cx, dim, item, fnOrScript.isFunction());
         }
 
         /** Called when compilation is finished. */
@@ -974,6 +981,9 @@ public class Dim {
         /** The 'this' object. */
         private Scriptable thisObj;
 
+        /** Whether this frame represents a function (vs a top-level script). */
+        private boolean isFunction;
+
         /** Information about the function. */
         private FunctionSource fsource;
 
@@ -984,10 +994,11 @@ public class Dim {
         private int lineNumber;
 
         /** Creates a new StackFrame. */
-        private StackFrame(Context cx, Dim dim, FunctionSource fsource) {
+        private StackFrame(Context cx, Dim dim, FunctionSource fsource, boolean isFunction) {
             this.dim = dim;
             this.contextData = ContextData.get(cx);
             this.fsource = fsource;
+            this.isFunction = isFunction;
             this.breakpoints = fsource.sourceInfo().breakpoints;
             this.lineNumber = fsource.firstLine();
         }
@@ -1036,16 +1047,6 @@ public class Dim {
                 dim.handleBreakpointHit(this, cx);
             }
             contextData.popFrame();
-        }
-        
-        @Override
-        public void onNativeWithEnter(Context cx, NativeWith withScope) {
-        	// ignore for now
-        }
-        
-        @Override
-        public void onNativeWithExit(Context cx, NativeWith withScope) {
-        	// ignore for now
         }
 
         /** Called when a 'debugger' statement is executed. */

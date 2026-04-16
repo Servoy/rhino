@@ -123,7 +123,7 @@ public abstract class SecurityController {
      * of <i>callable</i> under restricted security domain where an action is allowed only if it is
      * allowed according to the Java stack on the moment of the <i>execWithDomain</i> call and
      * <i>securityDomain</i>. Any call to {@link #getDynamicSecurityDomain(Object)} during execution
-     * of <code>callable.call(cx, scope, thisObj, args)</code> should return a domain incorporate
+     * of {@code callable.call(cx, scope, thisObj, args)} should return a domain incorporate
      * restrictions imposed by <i>securityDomain</i> and Java stack on the moment of callWithDomain
      * invocation.
      *
@@ -142,11 +142,21 @@ public abstract class SecurityController {
                 scope,
                 new Script() {
                     @Override
-                    public Object exec(Context cx, Scriptable scope) {
+                    public Object exec(Context cx, Scriptable scope, Scriptable thisObjIgnored) {
                         return callable.call(cx, scope, thisObj, args);
                     }
                 },
                 securityDomain);
+    }
+
+    public Object callWithDomain(
+            Object securityDomain,
+            Context cx,
+            final Script script,
+            Scriptable scope,
+            final Scriptable thisObj,
+            final Object[] args) {
+        return execWithDomain(cx, scope, script, securityDomain);
     }
 
     /**

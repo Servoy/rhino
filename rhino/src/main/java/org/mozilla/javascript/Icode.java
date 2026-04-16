@@ -81,10 +81,10 @@ abstract class Icode {
             Icode_LITERAL_NEW_OBJECT = Icode_INTNUMBER - 1,
             Icode_LITERAL_NEW_ARRAY = Icode_LITERAL_NEW_OBJECT - 1,
             Icode_LITERAL_SET = Icode_LITERAL_NEW_ARRAY - 1,
-            ICode_FN_STORE_HOME_OBJECT = Icode_LITERAL_SET - 1,
+            Icode_METHOD_EXPR = Icode_LITERAL_SET - 1,
 
             // Array literal with skipped index like [1,,2]
-            Icode_SPARE_ARRAYLIT = ICode_FN_STORE_HOME_OBJECT - 1,
+            Icode_SPARE_ARRAYLIT = Icode_METHOD_EXPR - 1,
 
             // Load index register to prepare for the following index operation
             Icode_REG_IND_C0 = Icode_SPARE_ARRAYLIT - 1,
@@ -162,8 +162,11 @@ abstract class Icode {
             // delete super.prop
             Icode_DELPROP_SUPER = Icode_CALL_ON_SUPER - 1,
 
+            // spread
+            Icode_SPREAD = Icode_DELPROP_SUPER - 1,
+
             // Last icode
-            MIN_ICODE = Icode_DELPROP_SUPER;
+            MIN_ICODE = Icode_SPREAD;
 
     static String bytecodeName(int bytecode) {
         if (!validBytecode(bytecode)) {
@@ -253,8 +256,8 @@ abstract class Icode {
                 return "LITERAL_NEW_ARRAY";
             case Icode_LITERAL_SET:
                 return "LITERAL_SET";
-            case ICode_FN_STORE_HOME_OBJECT:
-                return "FN_STORE_HOME_OBJECT";
+            case Icode_METHOD_EXPR:
+                return "METHOD_EXPR";
             case Icode_SPARE_ARRAYLIT:
                 return "SPARE_ARRAYLIT";
             case Icode_REG_IND_C0:
@@ -353,6 +356,8 @@ abstract class Icode {
                 return "CALL_ON_SUPER";
             case Icode_DELPROP_SUPER:
                 return "DELPROP_SUPER";
+            case Icode_SPREAD:
+                return "SPREAD";
         }
 
         // icode without name

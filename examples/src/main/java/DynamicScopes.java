@@ -53,6 +53,8 @@ public class DynamicScopes {
      * </pre>
      *
      * The final three lines may be permuted in any order depending on thread scheduling.
+     *
+     * @param args the array of arguments
      */
     public static void main(String[] args) {
         Context cx = Context.enter();
@@ -87,7 +89,7 @@ public class DynamicScopes {
 
         // Now we can execute the precompiled script against the scope
         // to define x variable and f function in the shared scope.
-        script.exec(cx, sharedScope);
+        script.exec(cx, sharedScope, sharedScope);
 
         // Now we spawn some threads that execute a script that calls the
         // function 'f'. The scope chain looks like this:
@@ -166,5 +168,10 @@ public class DynamicScopes {
         private Scriptable sharedScope;
         private String source;
         private String x;
+    }
+
+    /** Private constructor to prevent instantiation of this utility class. */
+    private DynamicScopes() {
+        // Utility class - prevent instantiation
     }
 }

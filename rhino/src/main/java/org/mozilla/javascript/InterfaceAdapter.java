@@ -6,9 +6,14 @@
 
 package org.mozilla.javascript;
 
+import java.lang.reflect.Constructor;
+import java.lang.reflect.InvocationHandler;
+import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
+import java.lang.reflect.Proxy;
 import java.util.HashSet;
+import org.mozilla.javascript.lc.type.TypeInfo;
 
 /**
  * Adapter to use JS function as implementation of Java interfaces with single method or multiple
@@ -21,8 +26,8 @@ public class InterfaceAdapter {
      * Make glue object implementing interface cl that will call the supplied JS function when
      * called. Only interfaces were all methods have the same signature is supported.
      *
-     * @return The glue object or null if <code>cl</code> is not interface or has methods with
-     *     different signatures.
+     * @return The glue object or null if {@code cl} is not interface or has methods with different
+     *     signatures.
      */
     static Object create(Context cx, Class<?> cl, ScriptableObject object) {
         if (!cl.isInterface()) throw new IllegalArgumentException();
@@ -72,8 +77,54 @@ public class InterfaceAdapter {
             adapter = new InterfaceAdapter(cf, cl);
             cache.cacheInterfaceAdapter(cl, adapter);
         }
-        return VMBridge.instance.newInterfaceProxy(
-                adapter.proxyHelper, cf, adapter, object, topScope);
+        return newInterfaceProxy(adapter.proxyHelper, cf, adapter, object, topScope);
+    }
+
+    private static Object newInterfaceProxy(
+            Object proxyHelper,
+            final ContextFactory cf,
+            final InterfaceAdapter adapter,
+            final Object target,
+            final Scriptable topScope) {
+        Constructor<?> c = (Constructor<?>) proxyHelper;
+
+        InvocationHandler handler =
+                new InvocationHandler() {
+                    @Override
+                    public Object invoke(Object proxy, Method method, Object[] args) {
+                        // In addition to methods declared in the interface, proxies
+                        // also route some java.lang.Object methods through the
+                        // invocation handler.
+                        if (method.getDeclaringClass() == Object.class) {
+                            String methodName = method.getName();
+                            if ("equals".equals(methodName)) {
+                                Object other = args[0];
+                                // Note: we could compare a proxy and its wrapped function
+                                // as equal here but that would break symmetry of equal().
+                                // The reason == suffices here is that proxies are cached
+                                // in ScriptableObject (see NativeJavaObject.coerceType())
+                                return Boolean.valueOf(proxy == other);
+                            }
+                            if ("hashCode".equals(methodName)) {
+                                return Integer.valueOf(target.hashCode());
+                            }
+                            if ("toString".equals(methodName)) {
+                                return "Proxy[" + target.toString() + "]";
+                            }
+                        }
+                        return adapter.invoke(cf, target, topScope, proxy, method, args);
+                    }
+                };
+        Object proxy;
+        try {
+            proxy = c.newInstance(handler);
+        } catch (InvocationTargetException ex) {
+            throw Context.throwAsScriptRuntimeEx(ex);
+        } catch (IllegalAccessException | InstantiationException ex) {
+            // Should not happen
+            throw new IllegalStateException(ex);
+        }
+        return proxy;
     }
 
     /**
@@ -83,9 +134,9 @@ public class InterfaceAdapter {
      * @return true, if the function
      */
     private static boolean isFunctionalMethodCandidate(Method method) {
-        if (method.getName().equals("equals")
-                || method.getName().equals("hashCode")
-                || method.getName().equals("toString")) {
+        if ("equals".equals(method.getName())
+                || "hashCode".equals(method.getName())
+                || "toString".equals(method.getName())) {
             // it should be safe to ignore them as there is also a special
             // case for these methods in VMBridge_jdk18.newInterfaceProxy
             return false;
@@ -95,7 +146,23 @@ public class InterfaceAdapter {
     }
 
     private InterfaceAdapter(ContextFactory cf, Class<?> cl) {
-        this.proxyHelper = VMBridge.instance.getInterfaceProxyHelper(cf, new Class[] {cl});
+        this.proxyHelper = getInterfaceProxyHelper(cf, new Class[] {cl});
+    }
+
+    @SuppressWarnings("deprecation")
+    private static Object getInterfaceProxyHelper(ContextFactory cf, Class<?>[] interfaces) {
+        // XXX: How to handle interfaces array withclasses from different
+        // class loaders? Using cf.getApplicationClassLoader() ?
+        ClassLoader loader = interfaces[0].getClassLoader();
+        Class<?> cl = Proxy.getProxyClass(loader, interfaces);
+        Constructor<?> c;
+        try {
+            c = cl.getConstructor(InvocationHandler.class);
+        } catch (NoSuchMethodException ex) {
+            // Should not happen
+            throw new IllegalStateException(ex);
+        }
+        return c;
     }
 
     public Object invoke(
@@ -148,11 +215,11 @@ public class InterfaceAdapter {
                 Object arg = args[i];
                 // neutralize wrap factory java primitive wrap feature
                 if (!(arg instanceof String || arg instanceof Number || arg instanceof Boolean)) {
-                    args[i] = wf.wrap(cx, topScope, arg, null);
+                    args[i] = wf.wrap(cx, topScope, arg, TypeInfo.NONE);
                 }
             }
         }
-        Scriptable thisObj = wf.wrapAsJavaObject(cx, topScope, thisObject, null);
+        Scriptable thisObj = wf.wrapAsJavaObject(cx, topScope, thisObject, TypeInfo.NONE);
 
         Object result = function.call(cx, topScope, thisObj, args);
         Class<?> javaResultType = method.getReturnType();

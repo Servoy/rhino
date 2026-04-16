@@ -6,13 +6,17 @@
 
 package org.mozilla.javascript;
 
-import java.lang.reflect.Array;
 import java.lang.reflect.Method;
 import java.util.Arrays;
 import java.util.EnumSet;
 import java.util.HashSet;
 import java.util.Set;
+import java.util.Map;
 import java.util.concurrent.CopyOnWriteArrayList;
+import org.mozilla.javascript.lc.type.ParameterizedTypeInfo;
+import org.mozilla.javascript.lc.type.TypeInfo;
+import org.mozilla.javascript.lc.type.TypeInfoFactory;
+import org.mozilla.javascript.lc.type.VariableTypeInfo;
 
 /**
  * This class reflects Java methods into the JavaScript environment and handles overloading of
@@ -49,8 +53,9 @@ public class NativeJavaMethod extends BaseFunction {
         return methods;
     }
 
+    @Deprecated
     public NativeJavaMethod(Method method, String name) {
-        this(new MemberBox(method), name);
+        this(new MemberBox(method, TypeInfoFactory.GLOBAL), name);
     }
 
     @Override
@@ -123,7 +128,7 @@ public class NativeJavaMethod extends BaseFunction {
             } else {
                 sb.append(methods[i].getName());
             }
-            sb.append(JavaMembers.liveConnectSignature(methods[i].argTypes));
+            sb.append(JavaMembers.liveConnectSignature(methods[i].getArgTypes()));
             sb.append('\n');
         }
         return sb.toString();
@@ -165,90 +170,18 @@ public class NativeJavaMethod extends BaseFunction {
         }
 
         MemberBox meth = methods[index];
-        Class<?>[] argTypes = meth.argTypes;
 
-        if (meth.vararg) {
-            // marshall the explicit parameters
-            Object[] newArgs = new Object[argTypes.length];
-            for (int i = 0; i < argTypes.length - 1; i++) {
-                newArgs[i] = Context.jsToJava(args[i], argTypes[i]);
-            }
-
-            Object varArgs;
-
-            // Handle special situation where a single variable parameter
-            // is given and it is a Java or ECMA array or is null.
-            if (args.length == argTypes.length
-                    && (args[args.length - 1] == null
-                            || args[args.length - 1] instanceof NativeArray
-                            || args[args.length - 1] instanceof NativeJavaArray)) {
-                // convert the ECMA array into a native array
-                varArgs = Context.jsToJava(args[args.length - 1], argTypes[argTypes.length - 1]);
-            } else {
-                // marshall the variable parameters
-                Class<?> componentType = argTypes[argTypes.length - 1].getComponentType();
-                varArgs = Array.newInstance(componentType, args.length - argTypes.length + 1);
-                for (int i = 0; i < Array.getLength(varArgs); i++) {
-                    Object value = Context.jsToJava(args[argTypes.length - 1 + i], componentType);
-                    Array.set(varArgs, i, value);
-                }
-            }
-
-            // add varargs
-            newArgs[argTypes.length - 1] = varArgs;
-            // replace the original args with the new one
-            args = newArgs;
-        } else {
-            if (argTypes.length == 1 && argTypes[0] == Object[].class) {
-                unwrapArray(args);
-                if (!(args.length == 1 && args[0] != null && args[0].getClass().isArray())) {
-                    Object[] array = new Object[1];
-                    array[0] = args;
-                    args = array;
-                }
-            } else {
-                // First, we marshall the args.
-                Object[] origArgs = args;
-                for (int i = 0; i < args.length; i++) {
-                    Object arg = args[i];
-                    Object coerced = Context.jsToJava(arg, argTypes[i]);
-                    if (coerced != arg) {
-                        if (origArgs == args) {
-                            args = args.clone();
-                        }
-                        if (coerced instanceof Object[]
-                                && !coerced.getClass().getComponentType().isPrimitive()) {
-                            if (Wrapper.class.isAssignableFrom(
-                                    coerced.getClass().getComponentType())) {
-                                Object[] array = new Object[((Object[]) coerced).length];
-                                System.arraycopy(coerced, 0, array, 0, array.length);
-                                coerced = array;
-                            }
-                            unwrapArray((Object[]) coerced);
-                        }
-                        args[i] = coerced;
-                    }
-                }
+        Map<VariableTypeInfo, TypeInfo> mapping = Map.of();
+        if (thisObj instanceof NativeJavaObject) {
+            var staticType = ((NativeJavaObject) thisObj).staticType;
+            if (staticType instanceof ParameterizedTypeInfo) {
+                mapping =
+                        ((ParameterizedTypeInfo) staticType)
+                                .extractConsolidationMapping(TypeInfoFactory.get(scope));
             }
         }
-        for (int i = 0; i < args.length; i++) {
-            if (args[i] instanceof Object[]) {
-                Object[] arg = (Object[]) args[i];
-                for (int j = 0; j < arg.length; j++) {
-                    if (arg[j] instanceof Wrapper) {
-                        if (!Wrapper.class.isAssignableFrom(arg.getClass().getComponentType())) {
-                            arg[j] = ((Wrapper) arg[j]).unwrap();
-                        }
-                    }
-                }
-            } else if (args[i] instanceof Wrapper && !argTypes[i].isInstance(args[i])) {
-                // in case of varargs (i >= argTypes.length) or method is declared with non-wrapper:
-                // call method with unwrapped
-                if (i >= argTypes.length || !Wrapper.class.isAssignableFrom(argTypes[i])) {
-                    args[i] = ((Wrapper) args[i]).unwrap();
-                }
-            }
-        }
+        args = meth.wrapArgsInternal(args, mapping);
+
         Object javaObject;
         if (meth.isStatic()) {
             javaObject = null; // don't need an object
@@ -280,33 +213,35 @@ public class NativeJavaMethod extends BaseFunction {
             printDebug("Calling ", meth, args);
         }
 
-        Object retval = meth.invoke(javaObject, args);
-        Class<?> staticType = meth.method().getReturnType();
+        var returnValue = meth.invoke(javaObject, args);
+        var returnType = meth.getReturnType();
 
         if (debug) {
-            Class<?> actualType = (retval == null) ? null : retval.getClass();
+            Class<?> actualType = (returnValue == null) ? null : returnValue.getClass();
             System.err.println(
                     " ----- Returned "
-                            + retval
+                            + returnValue
                             + " actual = "
                             + actualType
                             + " expect = "
-                            + staticType);
+                            + returnType.asClass());
+        }
+
+        if (returnType == TypeInfo.PRIMITIVE_VOID) {
+            // skip result wrapping if we don't need result at all
+            return Undefined.instance;
         }
 
         Object wrapped =
                 cx.getWrapFactory()
                         .wrap(
                                 cx, scope,
-                                retval, staticType);
+                                returnValue, returnType);
         if (debug) {
             Class<?> actualType = (wrapped == null) ? null : wrapped.getClass();
             System.err.println(" ----- Wrapped as " + wrapped + " class = " + actualType);
         }
 
-        if (wrapped == null && staticType == Void.TYPE) {
-            wrapped = Undefined.instance;
-        }
         return wrapped;
     }
 
@@ -528,21 +463,20 @@ public class NativeJavaMethod extends BaseFunction {
             int[] computedWeights1,
             MemberBox member2,
             int[] computedWeights2) {
-        final var types1 = member1.argTypes;
-        final var types2 = member2.argTypes;
+        final var types1 = member1.getArgTypes();
+        final var types2 = member2.getArgTypes();
 
         int totalPreference = 0;
         for (int j = 0; j < args.length; j++) {
-            var type1 =
-                    member1.vararg && j >= types1.length ? types1[types1.length - 1] : types1[j];
-            var type2 =
-                    member2.vararg && j >= types2.length ? types2[types2.length - 1] : types2[j];
-
-            if (member1.vararg && member2.vararg && j == (types2.length - 1) && type2.isArray())
-                type2 = type2.getComponentType();
-            if (member1.vararg && member2.vararg && j == (types1.length - 1) && type1.isArray())
-                type1 = type1.getComponentType();
-            if (type1 == type2) {
+            final var type1 =
+                    member1.vararg && j >= types1.size()
+                            ? types1.get(types1.size() - 1)
+                            : types1.get(j);
+            final var type2 =
+                    member2.vararg && j >= types2.size()
+                            ? types2.get(types2.size() - 1)
+                            : types2.get(j);
+            if (type1.asClass() == type2.asClass()) {
                 continue;
             }
 
@@ -560,8 +494,8 @@ public class NativeJavaMethod extends BaseFunction {
             // if they are not equal anymore test if we are now going to test pure varargs
             // skip those and return the best match until the var args
             if (totalPreference != PREFERENCE_EQUAL) {
-                if (types1.length - 1 == j && member1.vararg) continue;
-                if (types2.length - 1 == j && member2.vararg) continue;
+                if (types1.size() - 1 == j && member1.vararg) continue;
+                if (types2.size() - 1 == j && member2.vararg) continue;
             }
 
             // Determine which of type1, type2 is easier to convert from arg.
@@ -609,35 +543,35 @@ public class NativeJavaMethod extends BaseFunction {
      * @param arg
      * @return
      */
-    private static boolean exactFit(Class<?> type, Object arg) {
+    private static boolean exactFit(TypeInfo type, Object arg) {
         if (arg != null) {
             if (arg instanceof Wrapper) arg = ((Wrapper) arg).unwrap();
-            if (type == arg.getClass()) {
+            if (type.asClass() == arg.getClass()) {
                 return true;
             }
             if (type.isPrimitive()) {
-                if (type == int.class) {
+                if (type.is(int.class)) {
                     return arg.getClass() == Integer.class;
                 }
-                if (type == long.class) {
+                if (type.is(long.class)) {
                     return arg.getClass() == Long.class;
                 }
-                if (type == float.class) {
+                if (type.is(float.class)) {
                     return arg.getClass() == Float.class;
                 }
-                if (type == double.class) {
+                if (type.is(double.class)) {
                     return arg.getClass() == Double.class;
                 }
-                if (type == boolean.class) {
+                if (type.is(boolean.class)) {
                     return arg.getClass() == Boolean.class;
                 }
-                if (type == short.class) {
+                if (type.is(short.class)) {
                     return arg.getClass() == Short.class;
                 }
-                if (type == char.class) {
+                if (type.is(char.class)) {
                     return arg.getClass() == Character.class;
                 }
-                if (type == byte.class) {
+                if (type.is(byte.class)) {
                     return arg.getClass() == Byte.class;
                 }
             }
@@ -653,12 +587,12 @@ public class NativeJavaMethod extends BaseFunction {
      * <p>3. otherwise -> return an int array holding all computed conversion weights, whose length
      * will be {@code args.length} for non-vararg member or {@code args.length-1} for vararg member
      *
-     * @see NativeJavaObject#getConversionWeight(Object, Class)
-     * @see NativeJavaObject#canConvert(Object, Class)
+     * @see NativeJavaObject#getConversionWeight(Object, org.mozilla.javascript.lc.type.TypeInfo)
+     * @see NativeJavaObject#canConvert(Object, org.mozilla.javascript.lc.type.TypeInfo)
      */
     static int[] failFastConversionWeights(Object[] args, MemberBox member) {
-        final var argTypes = member.argTypes;
-        var typeLen = argTypes.length;
+        final var argTypes = member.getArgTypes();
+        var typeLen = argTypes.size();
         if (member.vararg) {
             typeLen--;
             if (typeLen > args.length) {
@@ -671,7 +605,7 @@ public class NativeJavaMethod extends BaseFunction {
         }
         final var weights = new int[typeLen];
         for (int i = 0; i < typeLen; i++) {
-            final var weight = NativeJavaObject.getConversionWeight(args[i], argTypes[i]);
+            final var weight = NativeJavaObject.getConversionWeight(args[i], argTypes.get(i));
             if (weight >= NativeJavaObject.CONVERSION_NONE) {
                 if (debug) {
                     printDebug("Rejecting (args can't convert) ", member, args);
@@ -695,7 +629,7 @@ public class NativeJavaMethod extends BaseFunction {
             if (member.isMethod()) {
                 sb.append(member.getName());
             }
-            sb.append(JavaMembers.liveConnectSignature(member.argTypes));
+            sb.append(JavaMembers.liveConnectSignature(member.getArgTypes()));
             sb.append(" for arguments (");
             sb.append(scriptSignature(args));
             sb.append(')');
