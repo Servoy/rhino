@@ -386,8 +386,12 @@ public class JavaMembers { // servoy patch, made public
                                     Method registered = registerMethod(map, method);
                                     // We don't want to replace the deprecated method here
                                     // because it is not available on Android.
-                                    if (includePrivate && !registered.isAccessible()) {
-                                        registered.setAccessible(true);
+                                    if (includePrivate /*&& !registered.isAccessible() patch just ignore if it is not possible to make it accessible*/) {
+                                        try {
+											registered.setAccessible(true);
+										} catch (Exception e) {
+											// ignore
+										}
                                     }
                                 }
                             }
@@ -778,8 +782,13 @@ public class JavaMembers { // servoy patch, made public
                     for (Field field : c.getDeclaredFields()) {
                         int mod = field.getModifiers();
                         if (includePrivate || isPublic(mod) || isProtected(mod)) {
-                            if (!field.isAccessible()) field.setAccessible(true);
-                            fieldsList.add(field);
+                            // if (!field.isAccessible()) patch, just ignore if it is not possible to make it accessible
+                        	try {
+	                            field.setAccessible(true);
+	                            fieldsList.add(field);
+                        	} catch (Exception e) {
+								// ignore
+							}
                         }
                     }
                 }
