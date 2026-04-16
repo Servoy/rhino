@@ -349,6 +349,10 @@ public class NativeArray extends ScriptableObject implements List, Wrapper {
                 modCount++;
                 denseOnly = false;
             }
+            // patch this also needs to update the length else JSON.stringify will use NativeArray.getLength() and that is then wrong.
+            if (id.equals("length")){
+            	length = ScriptRuntime.toUint32(value);
+            }
         }
     }
 
