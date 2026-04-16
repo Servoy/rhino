@@ -764,6 +764,9 @@ public class JavaMembers { // servoy patch, made public
                                 + cl.getName()
                                 + " due to lack of privileges.");
             }
+            catch(Exception e) {
+            	// ignore patch just ignore if java doesn't allow this
+            }
         }
         return cl.getConstructors();
     }
