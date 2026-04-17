@@ -264,27 +264,6 @@ public class NativeJavaMethod extends BaseFunction {
         return findFunction(cx, methods, args);
     }
 
-    /*
-     * @param args
-     */
-    private static void unwrapArray(Object[] args) {
-        unwrapArrayImpl(args, new HashSet<Object>());
-    }
-
-    private static void unwrapArrayImpl(Object[] args, Set<Object> processed) {
-        for (int j = 0; j < args.length; j++) {
-            if (args[j] instanceof Wrapper) {
-                if (processed.contains(args[j])) continue;
-                processed.add(args[j]);
-                args[j] = ((Wrapper) args[j]).unwrap();
-                if (args[j] instanceof Object[]
-                        && !args[j].getClass().getComponentType().isPrimitive()) {
-                    unwrapArrayImpl((Object[]) args[j], processed);
-                }
-            }
-        }
-    }
-
     /**
      * Find the index of the correct function to call given the set of methods or constructors and
      * the arguments. If no function can be found to call, return -1.

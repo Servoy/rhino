@@ -17,8 +17,11 @@ import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Member;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+
 import org.mozilla.javascript.lc.type.TypeInfo;
 import org.mozilla.javascript.lc.type.TypeInfoFactory;
 import org.mozilla.javascript.lc.type.VariableTypeInfo;
@@ -350,6 +353,18 @@ public final class MemberBox implements Serializable {
             }
 
             var wrappedArgs = args;
+            
+            if (argTypes.size() == 1 && argTypes.get(0).asClass() == Object[].class) {
+                unwrapArray(args);
+                if (!(args.length == 1 && args[0] != null && args[0].getClass().isArray())) {
+                    Object[] array = new Object[1];
+                    array[0] = args;
+                    args = array;
+                    argLen = 1;
+                    wrappedArgs = args;
+                }
+            }
+            
             for (int i = 0; i < argLen; i++) {
                 var arg = args[i];
                 var argType = argTypes.get(i);
@@ -407,6 +422,27 @@ public final class MemberBox implements Serializable {
         wrappedArgs[argTypesLen - 1] = varArgs;
 
         return wrappedArgs;
+    }
+    
+    /*
+     * @param args
+     */
+    private static void unwrapArray(Object[] args) {
+        unwrapArrayImpl(args, new HashSet<Object>());
+    }
+
+    private static void unwrapArrayImpl(Object[] args, Set<Object> processed) {
+        for (int j = 0; j < args.length; j++) {
+            if (args[j] instanceof Wrapper) {
+                if (processed.contains(args[j])) continue;
+                processed.add(args[j]);
+                args[j] = ((Wrapper) args[j]).unwrap();
+                if (args[j] instanceof Object[]
+                        && !args[j].getClass().getComponentType().isPrimitive()) {
+                    unwrapArrayImpl((Object[]) args[j], processed);
+                }
+            }
+        }
     }
 
     @SuppressWarnings("deprecation")
