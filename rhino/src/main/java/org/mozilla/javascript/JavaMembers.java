@@ -24,6 +24,8 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
+
 import org.mozilla.javascript.lc.member.NativeJavaField;
 import org.mozilla.javascript.lc.type.TypeInfo;
 import org.mozilla.javascript.lc.type.TypeInfoFactory;
@@ -777,9 +779,10 @@ public class JavaMembers { // servoy patch, made public
             try {
                 List<Field> fieldsList = new ArrayList<>();
 
-                // walk up superclass chain and grab fields. No need to deal specially with
-                // interfaces, since they can't have fields
-                for (var c = cl; c != null; c = c.getSuperclass()) {
+                // walk up superclass chain and grab fields. Also walk through all interfaces and grab fields from them as well
+                // because an interface can have a static field (constant)
+                // cl.getFields() below would return all those.
+                for (var c : collectRecursive(cl, new java.util.HashSet<>())) {
                     // get all declared fields in this class, make them
                     // accessible, and save
                     for (Field field : c.getDeclaredFields()) {
@@ -802,6 +805,22 @@ public class JavaMembers { // servoy patch, made public
             }
         }
         return cl.getFields();
+    }
+    
+    private Set<Class<?>> collectRecursive(Class<?> clz, Set<Class<?>> resultSet) {
+        // Base case: if null or already processed, stop
+        if (clz == null || !resultSet.add(clz)) {
+            return resultSet;
+        }
+
+        // 1. Climb the superclass ladder
+        collectRecursive(clz.getSuperclass(), resultSet);
+
+        // 2. Branch out into all interfaces
+        for (Class<?> iface : clz.getInterfaces()) {
+            collectRecursive(iface, resultSet);
+        }
+        return resultSet;
     }
 
     private static MemberBox extractGetMethod(MemberBox[] methods, boolean isStatic) {
