@@ -571,10 +571,9 @@ public class NativeJavaMethod extends BaseFunction {
      */
     static int[] failFastConversionWeights(Object[] args, MemberBox member) {
         final var argTypes = member.getArgTypes();
-        var typeLen = argTypes.size();
-        if (member.vararg) {
-            typeLen--;
-            if (typeLen > args.length) {
+        int typeLen = argTypes.size();
+		if (member.vararg) {
+            if (typeLen-1 > args.length) {
                 return null;
             }
         } else {
@@ -582,9 +581,15 @@ public class NativeJavaMethod extends BaseFunction {
                 return null;
             }
         }
-        final var weights = new int[typeLen];
-        for (int i = 0; i < typeLen; i++) {
-            final var weight = NativeJavaObject.getConversionWeight(args[i], argTypes.get(i));
+        final var weights = new int[args.length];
+        for (int i = 0; i < args.length; i++) {
+            TypeInfo argType;
+            if (member.vararg && i >= typeLen-1) {
+            	argType = argTypes.getLast().getComponentType();
+            } else {
+				argType = argTypes.get(i);
+			}
+			final var weight = NativeJavaObject.getConversionWeight(args[i], argType);
             if (weight >= NativeJavaObject.CONVERSION_NONE) {
                 if (debug) {
                     printDebug("Rejecting (args can't convert) ", member, args);
