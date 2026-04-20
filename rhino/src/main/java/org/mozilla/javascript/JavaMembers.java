@@ -70,7 +70,10 @@ public class JavaMembers { // servoy patch, made public
         if (member instanceof BeanProperty) {
             BeanProperty bp = (BeanProperty) member;
 
-            if (bp.getter.methods[0].method().getAnnotation(Deprecated.class) != null) {
+            if (bp.getter != null && bp.getter.methods[0].method().getAnnotation(Deprecated.class) != null) {
+                return true;
+            }
+            if (bp.setter != null && bp.setter.methods[0].method().getAnnotation(Deprecated.class) != null) {
                 return true;
             }
         }
