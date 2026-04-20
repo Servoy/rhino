@@ -348,7 +348,7 @@ public final class MemberBox implements Serializable {
 
         if (!this.vararg) {
             // fast path for getter
-            if (argLen == 0) {
+            if (argLen == 0 && argTypesLen == 0) {
                 return args;
             }
 
@@ -378,6 +378,24 @@ public final class MemberBox implements Serializable {
                         wrappedArgs = args.clone();
                     }
                     wrappedArgs[i] = coerced;
+                }
+            }
+            for (int i = 0; i < args.length; i++) {
+                if (args[i] instanceof Object[]) {
+                    Object[] arg = (Object[]) args[i];
+                    for (int j = 0; j < arg.length; j++) {
+                        if (arg[j] instanceof Wrapper) {
+                            if (!Wrapper.class.isAssignableFrom(arg.getClass().getComponentType())) {
+                                arg[j] = ((Wrapper) arg[j]).unwrap();
+                            }
+                        }
+                    }
+                } else if (args[i] instanceof Wrapper && !argTypes.get(i).asClass().isInstance(args[i])) {
+                    // in case of varargs (i >= argTypes.length) or method is declared with non-wrapper:
+                    // call method with unwrapped
+                    if (i >= argTypes.size() || !Wrapper.class.isAssignableFrom(argTypes.get(i).asClass())) {
+                        args[i] = ((Wrapper) args[i]).unwrap();
+                    }
                 }
             }
             return wrappedArgs;
