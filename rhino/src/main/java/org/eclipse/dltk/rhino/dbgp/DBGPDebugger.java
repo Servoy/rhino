@@ -547,7 +547,7 @@ public class DBGPDebugger extends Thread implements Debugger, IDebuggerWithWatch
      * this method skips NativeJavaMethods and Servoys own methods, the rest are just reported */
     public static boolean addProperty(Object property) {
         if (property instanceof NativeJavaMethod) return false;
-        if (property instanceof Function) {
+        if (property instanceof Function && !(property instanceof XMLObject)) {
             Function function = (Function) property;
             Object methodNameObj = function.has("_methodname_", function)?function.get("_methodname_", function):null;
             return (methodNameObj == null || methodNameObj.equals(Scriptable.NOT_FOUND))
