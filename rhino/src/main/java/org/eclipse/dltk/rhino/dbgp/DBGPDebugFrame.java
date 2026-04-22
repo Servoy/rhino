@@ -117,6 +117,20 @@ public class DBGPDebugFrame implements DebugFrame {
             stackManager.changeLine(this, lineNumber);
         }
     }
+    
+    @Override
+    public void onNativeWithEnter(Context cx, NativeWith withScope) {
+    	nativeWith.push(withScope);
+    	
+    }
+    
+    @Override
+    public void onNativeWithExit(Context cx, NativeWith withScope) {
+    	NativeWith pop = nativeWith.pop();
+    	if (pop != withScope) {
+			throw new IllegalStateException("Popped scope is different from exited one");
+		}
+    }
 
     public String getSourceName() {
         return sourceName;

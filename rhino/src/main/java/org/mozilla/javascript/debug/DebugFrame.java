@@ -62,4 +62,8 @@ public interface DebugFrame {
      * @param cx current Context for this thread
      */
     default void onDebuggerStatement(Context cx) {}
+    
+    default void onNativeWithEnter(Context cx, NativeWith withScope) {}
+    
+    default void onNativeWithExit(Context cx, NativeWith withScope) {}
 }

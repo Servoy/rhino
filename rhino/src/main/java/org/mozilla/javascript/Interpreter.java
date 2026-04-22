@@ -4171,6 +4171,9 @@ public final class Interpreter extends Icode implements Evaluator {
             if (lhs == DOUBLE_MARK) lhs = ScriptRuntime.wrapNumber(frame.sDbl[state.stackTop]);
             frame.scope = ScriptRuntime.enterWith(lhs, cx, frame.scope);
             state.stackTop--;
+            if (frame.debuggerFrame != null) {
+				frame.debuggerFrame.onNativeWithEnter(cx, (NativeWith) frame.scope);
+			}
             return null;
         }
     }
@@ -4178,6 +4181,9 @@ public final class Interpreter extends Icode implements Evaluator {
     private static class DoLeaveWith extends InstructionClass {
         @Override
         NewState execute(Context cx, CallFrame frame, InterpreterState state, int op) {
+        	if (frame.debuggerFrame != null) {
+				frame.debuggerFrame.onNativeWithExit(cx, (NativeWith) frame.scope);
+        	}
             frame.scope = ScriptRuntime.leaveWith(frame.scope);
             return null;
         }
