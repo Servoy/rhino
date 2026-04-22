@@ -5635,7 +5635,11 @@ public class ScriptRuntime {
                                 NativeObject.js_protoSetter(object, value);
                             }
                         } else {
-                            object.put(stringId, object, value);
+                        	if (type == Token.CONST && object instanceof ConstProperties cp) {
+                        		cp.defineConst(stringId, object);
+                        	} else {
+                        		object.put(stringId, object, value);
+                        	}
                         }
                     }
                 }
