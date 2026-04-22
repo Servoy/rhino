@@ -55,7 +55,7 @@ public class JavaMembers { // servoy patch, made public
             this.members = new HashMap<>();
             this.staticMembers = new HashMap<>();
             this.cl = cl;
-            boolean includePrivate = cx.hasFeature(Context.FEATURE_ENHANCED_JAVA_ACCESS);
+            boolean includePrivate = includeProtected && cx.hasFeature(Context.FEATURE_ENHANCED_JAVA_ACCESS);
             reflect(cx, scope, includeProtected, includePrivate);
         }
     }
