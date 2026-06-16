@@ -255,6 +255,7 @@ public class NativeArray extends ScriptableObject implements List, Wrapper {
             if (ids[i] instanceof Number) {
                 int index = ((Number) ids[i]).intValue();
                 Object o = get(index, this);
+                if (o instanceof ConsString) o = o.toString();
                 if (o != NOT_FOUND) {
                     while (al.size() <= index) al.add(null);
                     al.set(index, o);

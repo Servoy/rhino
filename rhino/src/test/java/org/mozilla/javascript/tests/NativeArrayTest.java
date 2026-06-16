@@ -15,6 +15,7 @@ import java.util.Arrays;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
+import org.mozilla.javascript.ConsString;
 import org.mozilla.javascript.Context;
 import org.mozilla.javascript.NativeArray;
 import org.mozilla.javascript.Scriptable;
@@ -164,6 +165,42 @@ public class NativeArrayTest {
             Scriptable scope = cx.initSafeStandardObjects(new TopLevel());
 
             assertNotNull(cx.evaluateString(scope, script, "test", 1, null));
+        }
+    }
+
+    @Test
+    public void unwrapShouldFlattenConsStringElements() {
+        array = new NativeArray(2);
+        array.put(0, array, null);
+        array.put(1, array, new ConsString("\"", new ConsString("testWrapped", "\"")));
+
+        Object unwrapped = array.unwrap();
+        assertTrue(unwrapped instanceof Object[]);
+        Object[] result = (Object[]) unwrapped;
+        assertEquals(2, result.length);
+        assertEquals(null, result[0]);
+        assertTrue("Expected String but got " + result[1].getClass().getName(),
+                result[1] instanceof String);
+        assertEquals("\"testWrapped\"", result[1]);
+    }
+
+    @Test
+    public void unwrapShouldFlattenConsStringFromScript() throws Exception {
+        try (Context cx = Context.enter()) {
+            Scriptable scope = cx.initStandardObjects();
+            String script =
+                    "var v = 'testWrapped';\n"
+                            + "var arr = [null, '\"' + v + '\"'];\n"
+                            + "arr;";
+            Object result = cx.evaluateString(scope, script, "test", 1, null);
+            assertTrue(result instanceof NativeArray);
+            NativeArray na = (NativeArray) result;
+            Object unwrapped = na.unwrap();
+            assertTrue(unwrapped instanceof Object[]);
+            Object[] arr = (Object[]) unwrapped;
+            assertTrue("Element should be String, got " + arr[1].getClass().getName(),
+                    arr[1] instanceof String);
+            assertEquals("\"testWrapped\"", arr[1]);
         }
     }
 }
