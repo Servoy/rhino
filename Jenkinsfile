@@ -33,8 +33,8 @@ pipeline {
         stage('Build Rhino') {
             steps {
                 configFileProvider([
-                    configFile(fileId: 'ba7b9372-76e5-4898-a2be-1dde60a0d6e3', variable: 'SETTINGS'),
-                    configFile(fileId: '254658cc-4d79-45bf-ace9-28bd69fd403d', variable: 'TOOLCHAIN')
+                    configFile(fileId: 'master_mvn_repo', variable: 'SETTINGS'),
+                    configFile(fileId: 'maven_toolchain', variable: 'TOOLCHAIN')
                 ]) {
                     sh 'mvn -B -s "$SETTINGS" -t "$TOOLCHAIN" $goals'
                 }
