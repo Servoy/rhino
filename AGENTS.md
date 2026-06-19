@@ -19,6 +19,7 @@ gradle wrapper (`./gradlew`). There are no external dependencies, except for JUn
 - New test classes should be written using JUnit 5. Migrating existing tests from JUnit 4 to JUnit 5 is not a goal
   though, unless explicitly requested.
 - Code style is enforced via spotless. After every change, reformat the code.
+- **Bundle versioning:** When making changes, ask the user whether the `Bundle-Version` in `META-INF/MANIFEST.MF` should be incremented. The version bump happens once per Servoy release cycle (e.g., once for 2026.6, once for 2026.9). If no bump has occurred yet on the current branch for the current release and there are code changes, the qualifier should be incremented (e.g., `1.9.1.s1` -> `1.9.1.s2`).
 
 ## Code organization
 
