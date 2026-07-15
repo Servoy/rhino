@@ -20,7 +20,6 @@ import org.mozilla.javascript.ast.Name;
 import org.mozilla.javascript.ast.Scope;
 import org.mozilla.javascript.ast.ScriptNode;
 import org.mozilla.javascript.ast.Symbol;
-import org.mozilla.javascript.ast.VariableDeclaration;
 
 /**
  * This class transforms a tree to a lower-level representation for codegen.
@@ -445,15 +444,18 @@ public class NodeTransformer {
         Node vars = scopeNode.getFirstChild();
         Node consts  = null;
         Node body = null;
-        // you can get here with a variable decl right in the for loop 
-        // or let/const inside the block
-        if (!(vars instanceof VariableDeclaration)) {
-        	consts  = vars.getNext();
+        // Block-scoped let/const (see transformCompilationUnit_r) produces a
+        // separate CONST grouping node as the second child. Legacy let statements
+        // and destructuring LETEXPRs do not, and must fall back to the original
+        // "body is the second child" behaviour.
+        Node second = vars.getNext();
+        if (second != null && second.getType() == Token.CONST) {
+        	consts  = second;
         	body = consts.getNext();
         	scopeNode.removeChild(consts);
         }
         else {
-        	body = vars.getNext();
+        	body = second;
         }
         scopeNode.removeChild(vars);
         scopeNode.removeChild(body);
