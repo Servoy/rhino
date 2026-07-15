@@ -1,14 +1,24 @@
 # Rhino
 
-Rhino is an open source (MPL 2.0) JavaScript engine, implemented in Java 11. The build system used is gradle, via the
-gradle wrapper (`./gradlew`). There are no external dependencies, except for JUnit for unit tests.
+Rhino is an open source (MPL 2.0) JavaScript engine, implemented in Java 11. Upstream, the build system used is gradle,
+via the gradle wrapper (`./gradlew`). There are no external dependencies, except for JUnit for unit tests.
+
+**Servoy fork note:** In this Servoy fork the project is built with **Maven (`mvn`)**, not gradle, and it is packaged as
+an Eclipse/OSGi bundle (see `META-INF/MANIFEST.MF`). The gradle build may fail here because Servoy code uses Java 16+
+features (records, pattern-matching `instanceof`) while the upstream gradle build enforces `options.release = 11`.
+Prefer Maven for building, and run/verify tests through the **Eclipse JUnit test runner** (Run As > JUnit Test, or the
+`eclipse-ide` / `eclipse-pde` JUnit tools) rather than `./gradlew test`.
 
 ## Useful commands
 
-1. Build: `./gradlew build`
-2. Run tests: `./gradlew test`
-3. Format code: `./gradlew spotlessApply`
-4. Checks (tests, formatting): `./gradlew check`
+1. Build (Servoy): `mvn` (Maven) — this is how Servoy builds the project.
+2. Run tests (Servoy): use the **Eclipse JUnit test runner** (e.g. the `eclipse-ide_runClassTests` /
+   `eclipse-ide_runAllTests` tools, or Run As > JUnit Test in the IDE).
+3. Upstream gradle commands (may not work in this fork, kept for reference):
+   - Build: `./gradlew build`
+   - Run tests: `./gradlew test`
+   - Format code: `./gradlew spotlessApply`
+   - Checks (tests, formatting): `./gradlew check`
 
 ## Rules and code style
 
