@@ -647,6 +647,7 @@ class SuperTest {
         }
 
         @Test
+        @org.junit.jupiter.api.Disabled("Servoy intentionally throws on readonly property writes in non-strict mode (matches browser behavior, see SVY-19261)")
         void superPropertyNotWritableIgnoredSilentlyInNonStrictMode() {
             String script =
                     ""
@@ -664,6 +665,7 @@ class SuperTest {
         }
 
         @Test
+        @org.junit.jupiter.api.Disabled("Servoy intentionally throws on readonly property writes in non-strict mode (matches browser behavior, see SVY-19261)")
         void thisPropertyNotWritableIgnoredSilentlyInNonStrictMode() {
             String script =
                     ""
@@ -735,6 +737,7 @@ class SuperTest {
         }
 
         @Test
+        @org.junit.jupiter.api.Disabled("Servoy intentionally throws on sealed object property writes in non-strict mode (matches browser behavior, see SVY-19261)")
         void missingPropertyPrototypeSealedCreatesItOnTheThisObject() {
             String script =
                     ""
@@ -751,6 +754,7 @@ class SuperTest {
         }
 
         @Test
+        @org.junit.jupiter.api.Disabled("Servoy intentionally throws on sealed object property writes in non-strict mode (matches browser behavior, see SVY-19261)")
         void missingPropertyThisSealedIsIgnoredSilentlyInNonStrictMode() {
             String script =
                     ""
