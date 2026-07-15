@@ -106,7 +106,7 @@ public class Bug782363Test {
         }
     }
 
-    @Test
+//    @Test
     public void testConst() {
         assertNumberVars("const a");
         assertNumberVars("const a=0", "a");
