@@ -106,7 +106,10 @@ public class InitializationTest {
             ScriptableObject root = cx.initSafeStandardObjects();
             root.put("mp", root, Map.of("k0", "v0"));
             Object result = cx.evaluateString(root, code, "test", 1, null);
-            assertEquals("k0,v0", result);
+            // Servoy patch: array toString always wraps in [...] like a Java array
+            // (see NativeArray.toString), so a map entry [key, value] stringifies
+            // as "[k0,v0]" instead of upstream Rhino's "k0,v0".
+            assertEquals("[k0,v0]", result);
         }
     }
 

@@ -2477,17 +2477,34 @@ class BodyCodegen {
 
     private void addLoadPropertyId(Node node, Object[] properties, int i) {
         Object id = properties[i];
-        if (id instanceof Node) {
+        if (id instanceof org.mozilla.javascript.IndexObject io) {
+            // Block-scoped let/const literal ids are wrapped so the runtime can
+            // tell const from let (see SVY-19261 / ScriptRuntime.fillObjectLiteral).
+            // Reconstruct the wrapper so the same information reaches the runtime.
+            cfw.add(ByteCode.NEW, "org/mozilla/javascript/IndexObject");
+            cfw.add(ByteCode.DUP);
+            addLoadLiteralId(io.indexObject());
+            cfw.addPush(io.type());
+            cfw.addInvoke(
+                    ByteCode.INVOKESPECIAL,
+                    "org/mozilla/javascript/IndexObject",
+                    "<init>",
+                    "(Ljava/lang/Object;I)V");
+        } else if (id instanceof Node) {
             // Will be a node of type Token.COMPUTED_PROPERTY wrapping the actual expression
             Node computedPropertyNode = (Node) id;
             generateExpression(computedPropertyNode.getFirstChild(), node);
         } else {
-            if (id instanceof String) {
-                cfw.addPush((String) id);
-            } else {
-                cfw.addPush(((Integer) id).intValue());
-                addScriptRuntimeInvoke("wrapInt", "(I)Ljava/lang/Integer;");
-            }
+            addLoadLiteralId(id);
+        }
+    }
+
+    private void addLoadLiteralId(Object id) {
+        if (id instanceof String) {
+            cfw.addPush((String) id);
+        } else {
+            cfw.addPush(((Integer) id).intValue());
+            addScriptRuntimeInvoke("wrapInt", "(I)Ljava/lang/Integer;");
         }
     }
 
