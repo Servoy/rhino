@@ -33,3 +33,4 @@ rhino.iws
 # android specific
 android-sdk/
 local.properties
+/bin_test/
