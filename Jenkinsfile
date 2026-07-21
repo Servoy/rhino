@@ -30,7 +30,7 @@ pipeline {
         jdk 'Java 21' // Uniform meegetrokken naar Java 21
         maven 'Maven 3.9.16'
     }
-    
+
     stages {
         stage('Build Rhino') {
             steps {
