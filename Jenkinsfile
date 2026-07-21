@@ -7,10 +7,17 @@ pipeline {
         buildDiscarder(logRotator(daysToKeepStr: '40', numToKeepStr: '69'))
     }
     
-    triggers {
-        githubPush()
+   triggers {
+        GenericTrigger(
+            genericVariables: [
+                [key: 'ref', value: '$.ref']
+            ],
+            token: 'rhino',
+            regexpFilterText: '$ref',
+            regexpFilterExpression: "^refs/heads/${env.BRANCH}\$"
+        )
     }
-    
+
     parameters {
         string(name: 'goals', defaultValue: 'clean install', trim: false)
     }
@@ -25,11 +32,6 @@ pipeline {
     }
     
     stages {
-        stage('Checkout') {
-            steps {
-                checkout scm
-            }
-        }
         stage('Build Rhino') {
             steps {
                 configFileProvider([
