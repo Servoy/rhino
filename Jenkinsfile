@@ -21,7 +21,7 @@ pipeline {
     parameters {
         string(name: 'goals', defaultValue: 'clean install', trim: false)
     }
-    
+
     environment {
         TEAMS_WEBHOOK = credentials('servoy-teams-webhook')
     }
