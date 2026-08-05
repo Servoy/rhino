@@ -14,7 +14,7 @@ pipeline {
             ],
             token: 'rhino',
             regexpFilterText: '$ref',
-            regexpFilterExpression: "^refs/heads/${env.BRANCH}\$"
+            regexpFilterExpression: "^refs/heads/lts_2026\$"
         )
     }
 
