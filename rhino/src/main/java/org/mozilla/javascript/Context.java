@@ -2866,7 +2866,17 @@ public class Context implements Closeable {
 
     // For the interpreter to store the last frame for error reports
     // etc. Previous frames can all be derived from this.
-    Object lastInterpreterFrame;
+    // Servoy patch: made volatile so it can be safely read from other threads for diagnostic stack dumps.
+    volatile Object lastInterpreterFrame;
+
+    // Servoy patch: allow reading the script stack from outside the executing thread for diagnostic stack dumps.
+    public ScriptStackElement[] getScriptStack() {
+        Object frame = lastInterpreterFrame;
+        if (frame == null) {
+            return null;
+        }
+        return Interpreter.getScriptStackFromFrame(frame);
+    }
 
     // For instruction counting (interpreter only)
     int instructionCount;

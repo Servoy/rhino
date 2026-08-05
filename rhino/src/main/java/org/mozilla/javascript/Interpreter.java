@@ -1378,6 +1378,37 @@ public final class Interpreter extends Icode implements Evaluator {
         return list.toArray(new ScriptStackElement[list.size()][]);
     }
 
+    // Servoy patch: extract script stack elements from an interpreter frame, callable from any thread for diagnostic stack dumps.
+    public static ScriptStackElement[] getScriptStackFromFrame(Object frameObj) {
+        if (frameObj == null) {
+            return null;
+        }
+        CallFrame frame = (CallFrame) frameObj;
+        List<ScriptStackElement> elements = new ArrayList<>();
+
+        CallFrame outerFrame = frame;
+        while (outerFrame != null) {
+            CallFrame callerFrame = outerFrame;
+            CallFrame calleeFrame = null;
+            while (callerFrame != null) {
+                InterpreterData idata = callerFrame.idata;
+                JSDescriptor desc = callerFrame.fnOrScript.getDescriptor();
+                String fileName = desc.getSourceName();
+                String functionName = null;
+                int pc = calleeFrame == null ? callerFrame.pcSourceLineStart : calleeFrame.parentPC;
+                int lineNumber = pc >= 0 ? getIndex(idata.itsICode, pc) : -1;
+                if (desc.getName() != null && desc.getName().length() != 0) {
+                    functionName = desc.getName();
+                }
+                calleeFrame = callerFrame;
+                callerFrame = callerFrame.parentFrame;
+                elements.add(new ScriptStackElement(fileName, functionName, lineNumber));
+            }
+            outerFrame = calleeFrame.previousInterpreterFrame;
+        }
+        return elements.toArray(new ScriptStackElement[0]);
+    }
+
     static String getRawSource(JSDescriptor desc) {
         if (desc.getRawSource() == null) {
             return null;
