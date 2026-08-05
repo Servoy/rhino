@@ -14,7 +14,7 @@ pipeline {
             ],
             token: 'rhino',
             regexpFilterText: '$ref',
-            regexpFilterExpression: "^refs/heads/lts_2025\$"
+            regexpFilterExpression: "^refs/heads/lts_2026\$"
         )
     }
 
