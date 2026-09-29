@@ -9,11 +9,16 @@ features (records, pattern-matching `instanceof`) while the upstream gradle buil
 Prefer Maven for building, and run/verify tests through the **Eclipse JUnit test runner** (Run As > JUnit Test, or the
 `eclipse-ide` / `eclipse-pde` JUnit tools) rather than `./gradlew test`.
 
+> **Eclipse MCP tools run only through Code Mode.** Call them from inside the `execute` tool using
+> bracket notation (e.g. `await tools["eclipse-ide"].runJUnitTests({ ... })`), never as a plain
+> `eclipse-ide_*` tool, and never fall back to the built-in `edit`/`write` for workspace files —
+> use `tools["eclipse-coder"]` for edits.
+
 ## Useful commands
 
 1. Build (Servoy): `mvn` (Maven) — this is how Servoy builds the project.
-2. Run tests (Servoy): use the **Eclipse JUnit test runner** (e.g. the `eclipse-ide_runClassTests` /
-   `eclipse-ide_runAllTests` tools, or Run As > JUnit Test in the IDE).
+2. Run tests (Servoy): use the **Eclipse JUnit test runner** — `tools["eclipse-ide"].runJUnitTests`
+   (via `execute`), or Run As > JUnit Test in the IDE.
 3. Upstream gradle commands (may not work in this fork, kept for reference):
    - Build: `./gradlew build`
    - Run tests: `./gradlew test`
