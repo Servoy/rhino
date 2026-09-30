@@ -36,6 +36,14 @@ Prefer Maven for building, and run/verify tests through the **Eclipse JUnit test
 - Code style is enforced via spotless. After every change, reformat the code.
 - **Bundle versioning:** When making changes, ask the user whether the `Bundle-Version` in `META-INF/MANIFEST.MF` should be incremented. The version bump happens once per Servoy release cycle (e.g., once for 2026.6, once for 2026.9). If no bump has occurred yet on the current branch for the current release and there are code changes, the qualifier should be incremented (e.g., `1.9.1.s1` -> `1.9.1.s2`). **Important:** the version in `pom.xml` must always be kept in sync with `META-INF/MANIFEST.MF` — update both when bumping.
 
+## Jira API
+
+For anything Jira — reading, creating, updating, commenting on, linking, searching (JQL),
+assigning or transitioning issues — load the **`servoy-jira`** skill (global opencode skill)
+and follow its instructions. It holds the connection details (base URL, `ATLASSIAN_AUTH_BASIC`
+auth), the per-OS command recipes and the ADF templates. Always load the skill first rather
+than hand-rolling the REST calls.
+
 ## Code organization
 
 The code base is organized in multiple modules. Most changes will go into the `rhino` or `tests` modules. Refer to
