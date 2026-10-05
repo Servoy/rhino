@@ -476,32 +476,34 @@ public final class MemberBox implements Serializable {
         int modifiers = method.getModifiers();
         if (Modifier.isPublic(modifiers) && !Modifier.isStatic(modifiers)) {
             Class<?> c = method.getDeclaringClass();
-            if (!Modifier.isPublic(c.getModifiers())) {
-                String name = method.getName();
-                Class<?>[] intfs = c.getInterfaces();
-                for (int i = 0, N = intfs.length; i != N; ++i) {
-                    Class<?> intf = intfs[i];
+            // SVY-21337: do not gate the reroute on !isPublic(declaringClass); a public class
+            // can live in a non-exported JPMS package (e.g. sun.nio.ch.FileChannelImpl), whose
+            // direct invoke throws InaccessibleObjectException, so we must still reroute to a
+            // public supertype/interface method.
+            String name = method.getName();
+            Class<?>[] intfs = c.getInterfaces();
+            for (int i = 0, N = intfs.length; i != N; ++i) {
+                Class<?> intf = intfs[i];
 //                    if (Modifier.isPublic(intf.getModifiers())) {
-                        try {
-                            return intf.getMethod(name, params);
-                        } catch (NoSuchMethodException | SecurityException ex) {
-                        }
-//                    }
-                }
-                for (; ; ) {
-                    c = c.getSuperclass();
-                    if (c == null) {
-                        break;
+                    try {
+                        return intf.getMethod(name, params);
+                    } catch (NoSuchMethodException | SecurityException ex) {
                     }
-                    if (Modifier.isPublic(c.getModifiers())) {
-                        try {
-                            Method m = c.getMethod(name, params);
-                            int mModifiers = m.getModifiers();
-                            if (Modifier.isPublic(mModifiers) && !Modifier.isStatic(mModifiers)) {
-                                return m;
-                            }
-                        } catch (NoSuchMethodException | SecurityException ex) {
+//                    }
+            }
+            for (; ; ) {
+                c = c.getSuperclass();
+                if (c == null) {
+                    break;
+                }
+                if (Modifier.isPublic(c.getModifiers())) {
+                    try {
+                        Method m = c.getMethod(name, params);
+                        int mModifiers = m.getModifiers();
+                        if (Modifier.isPublic(mModifiers) && !Modifier.isStatic(mModifiers)) {
+                            return m;
                         }
+                    } catch (NoSuchMethodException | SecurityException ex) {
                     }
                 }
             }
