@@ -294,6 +294,9 @@ public final class MemberBox implements Serializable {
             try {
                 return method.invoke(target, args);
             } catch (IllegalAccessException ex) {
+                // A public method whose declaring class lives in a non-exported JPMS module
+                // (e.g. sun.nio.ch.FileChannelImpl) surfaces here as IllegalAccessException, so
+                // the reroute below to a public supertype/interface method is reached. (SVY-21337)
                 Method accessible =
                         searchAccessibleMethod(
                                 method,
@@ -484,12 +487,10 @@ public final class MemberBox implements Serializable {
             Class<?>[] intfs = c.getInterfaces();
             for (int i = 0, N = intfs.length; i != N; ++i) {
                 Class<?> intf = intfs[i];
-//                    if (Modifier.isPublic(intf.getModifiers())) {
-                    try {
-                        return intf.getMethod(name, params);
-                    } catch (NoSuchMethodException | SecurityException ex) {
-                    }
-//                    }
+                try {
+                    return intf.getMethod(name, params);
+                } catch (NoSuchMethodException | SecurityException ex) {
+                }
             }
             for (; ; ) {
                 c = c.getSuperclass();
