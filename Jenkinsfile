@@ -42,12 +42,20 @@ pipeline {
                 }
             }
         }
+        stage('Test Rhino') {
+            steps {
+                // Only run the Servoy-added tests. The full upstream suite has many
+                // pre-existing behavioral divergences against this fork and is not yet triaged;
+                // run it manually with: ./gradlew :tests:test
+                sh './gradlew :tests:test --tests "org.mozilla.javascript.tests.servoy.*"'
+            }
+        }
     }
     
     post {
         always {
             // Testresultaten verzamelen (AggregatedTestResultPublisher)
-            junit allowEmptyResults: true, testResults: '**/target/surefire-reports/*.xml'
+            junit allowEmptyResults: true, testResults: '**/target/surefire-reports/*.xml, **/build/test-results/test/*.xml'
         }
         
         success {
