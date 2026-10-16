@@ -26,3 +26,4 @@ rhino.iws
 
 # VSCode
 .vscode
+/org.eclipse.dltk.javascript.rhino/
