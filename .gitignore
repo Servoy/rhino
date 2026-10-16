@@ -34,3 +34,5 @@ rhino.iws
 android-sdk/
 local.properties
 /bin_test/
+/org.eclipse.dltk.javascript.rhino/
+/.opencode/
